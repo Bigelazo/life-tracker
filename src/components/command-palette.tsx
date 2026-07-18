@@ -54,7 +54,7 @@ export function CommandPalette() {
     >
       <CommandInput
         placeholder="Type a command or search…"
-        className="border-b-hairline text-ink placeholder:text-ink-tertiary"
+        className="border-b-hairline text-ink placeholder:text-ink-tertiary pt-4 pb-3 px-4 outline-none focus-visible:outline-none"
       />
       <CommandList>
         <CommandEmpty className="text-ink-subtle py-6 text-center text-sm">
