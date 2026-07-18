@@ -67,8 +67,10 @@ body {
   }
 }
 
-/* Focus ring: 2px lavender at 50% opacity, per DESIGN.md elevation table */
-*:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--color-primary-focus) 50%, transparent);
-  outline-offset: 2px;
+@layer base {
+  /* Focus ring: 2px lavender at 50% opacity, per DESIGN.md elevation table */
+  *:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--color-primary-focus) 50%, transparent);
+    outline-offset: 2px;
+  }
 }
