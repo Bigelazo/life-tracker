@@ -57,13 +57,14 @@ body {
   letter-spacing: -0.003em;
 }
 
-/* Headings pull negative tracking per the DESIGN.md type scale */
-h1,
-h2,
-h3,
-h4 {
-  letter-spacing: -0.02em;
-  font-weight: 600;
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: -0.02em;
+    font-weight: 600;
+  }
 }
 
 /* Focus ring: 2px lavender at 50% opacity, per DESIGN.md elevation table */

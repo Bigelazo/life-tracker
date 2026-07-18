@@ -10,13 +10,13 @@ const section = {
 
 describe("WidgetCard", () => {
   it("renders the section label and description", () => {
-    render(<WidgetCard section={section} description="Track habits." delay={0} />);
+    render(<WidgetCard section={section} description="Track habits." />);
     expect(screen.getByText("Habits")).toBeInTheDocument();
     expect(screen.getByText("Track habits.")).toBeInTheDocument();
   });
 
   it("links to the section href", () => {
-    render(<WidgetCard section={section} description="Track habits." delay={0} />);
+    render(<WidgetCard section={section} description="Track habits." />);
     const links = screen.getAllByRole("link");
     expect(links.length).toBeGreaterThan(0);
     expect(links[0]).toHaveAttribute("href", "/habits");
@@ -24,7 +24,7 @@ describe("WidgetCard", () => {
 
   it("renders an icon for the section slug", () => {
     const { container } = render(
-      <WidgetCard section={section} description="Track habits." delay={0} />
+      <WidgetCard section={section} description="Track habits." />
     );
     const svgs = container.querySelectorAll("svg");
     expect(svgs.length).toBeGreaterThan(0);

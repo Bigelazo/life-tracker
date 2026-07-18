@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   CommandDialog,
@@ -13,6 +13,7 @@ import {
 } from "cmdk";
 import { SECTIONS } from "@/lib/sections";
 import { SectionIcon } from "@/components/section-icon";
+import { signOut as signOutAction } from "@/auth/actions";
 
 const NAV_ITEMS = SECTIONS.map((section) => ({
   id: section.slug,
@@ -24,11 +25,12 @@ const NAV_ITEMS = SECTIONS.map((section) => ({
 export function CommandPalette() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [pending, startTransition] = useTransition();
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      setOpen((prev) => !prev);
+      setOpen(true);
     }
   }, []);
 
@@ -75,10 +77,17 @@ export function CommandPalette() {
         <CommandGroup heading="Actions" className="[&_[cmdk-group-heading]]:text-ink-tertiary [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium">
           <CommandItem
             value="sign-out"
-            onSelect={() => handleSelect("/login")}
+            disabled={pending}
+            onSelect={() => {
+              setOpen(false);
+              startTransition(async () => {
+                await signOutAction();
+                router.push("/login");
+              });
+            }}
             className="text-ink aria-selected:bg-surface-3 flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors"
           >
-            Sign out
+            {pending ? "Signing out…" : "Sign out"}
           </CommandItem>
         </CommandGroup>
       </CommandList>

@@ -11,6 +11,8 @@ const DESCRIPTIONS: Record<string, string> = {
   notes: "Markdown pages with wikilinks, backlinks and full-text search.",
 };
 
+const STAGGER = 0.08;
+
 export const metadata: Metadata = { title: "Today" };
 
 export default function TodayPage() {
@@ -30,17 +32,14 @@ export default function TodayPage() {
         animate="visible"
         variants={{
           hidden: {},
-          visible: { transition: { staggerChildren: 0.08 } },
+          visible: { transition: { staggerChildren: STAGGER } },
         }}
       >
-        {WIDGET_SECTIONS.map((section, i) => (
+        {WIDGET_SECTIONS.map((section) => (
           <WidgetCard
             key={section.slug}
             section={section}
-            description={
-              DESCRIPTIONS[section.slug] ?? "Coming soon."
-            }
-            delay={i * 0.08}
+            description={DESCRIPTIONS[section.slug] ?? "Coming soon."}
           />
         ))}
       </m.div>

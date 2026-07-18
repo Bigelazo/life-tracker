@@ -8,17 +8,15 @@ import { SectionIcon } from "@/components/section-icon";
 export function WidgetCard({
   section,
   description,
-  delay,
 }: {
   section: Section;
   description: string;
-  delay: number;
 }) {
   return (
     <m.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay, ease: "easeOut" }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
     >
       <Link
         href={section.href}
