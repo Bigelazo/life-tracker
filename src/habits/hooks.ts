@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { HabitLogResponse, HabitResponse } from "./api-types";
+import type { HabitFrequency } from "./domain";
 
 export function useSettings() {
   return useQuery({
@@ -35,7 +36,13 @@ export function useHabitLogs() {
 export function useCreateHabit() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: { name: string; description?: string }) =>
+    mutationFn: (data: {
+      name: string;
+      description?: string;
+      frequency?: HabitFrequency;
+      target?: number | null;
+      unit?: string | null;
+    }) =>
       fetchJSON<HabitResponse>("/api/habits", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -60,6 +67,9 @@ export function useUpdateHabit() {
       name?: string;
       description?: string | null;
       archived?: boolean;
+      frequency?: HabitFrequency;
+      target?: number | null;
+      unit?: string | null;
     }) =>
       fetchJSON<HabitResponse>(`/api/habits/${id}`, {
         method: "PATCH",
@@ -93,25 +103,31 @@ export function useCheckHabit() {
     mutationFn: ({
       habitId,
       logDate,
+      amount,
     }: {
       habitId: string;
       logDate: string;
+      amount?: number;
     }) =>
-      fetchJSON<{ id: string | null; habitId: string; logDate: string }>(
-        `/api/habits/${habitId}/log`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ logDate }),
-        },
-      ),
-    onMutate: async ({ habitId, logDate }) => {
+      fetchJSON<{
+        id: string | null;
+        habitId: string;
+        logDate: string;
+        amount: number;
+        createdAt: string | null;
+      }>(`/api/habits/${habitId}/log`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logDate, amount }),
+      }),
+    onMutate: async ({ habitId, logDate, amount }) => {
       await qc.cancelQueries({ queryKey: ["habit-logs"] });
       const previous = qc.getQueryData<HabitLogResponse[]>(["habit-logs"]);
       const optimistic: HabitLogResponse = {
-        id: `optimistic-${habitId}-${logDate}`,
+        id: `optimistic-${habitId}-${logDate}-${Date.now()}`,
         habitId,
         logDate,
+        amount: amount ?? 1,
         createdAt: new Date().toISOString(),
       };
       qc.setQueryData<HabitLogResponse[]>(["habit-logs"], (old) =>

@@ -15,6 +15,13 @@
       "when": 1784412031204,
       "tag": "0001_watery_major_mapleleaf",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784414398292,
+      "tag": "0002_workable_natasha_romanoff",
+      "breakpoints": true
     }
   ]
 }

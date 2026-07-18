@@ -9,6 +9,7 @@ export async function GET() {
       id: habitLogs.id,
       habitId: habitLogs.habitId,
       logDate: habitLogs.logDate,
+      amount: habitLogs.amount,
       createdAt: habitLogs.createdAt,
     })
     .from(habitLogs)
@@ -19,6 +20,7 @@ export async function GET() {
       id: l.id,
       habitId: l.habitId,
       logDate: l.logDate,
+      amount: l.amount,
       createdAt: l.createdAt.toISOString(),
     })),
   );

@@ -4,10 +4,11 @@ import {
   check,
   date,
   integer,
+  jsonb,
   pgTable,
+  real,
   text,
   timestamp,
-  unique,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -31,6 +32,9 @@ export const habits = pgTable("habits", {
   name: text("name").notNull(),
   description: text("description"),
   archived: boolean("archived").notNull().default(false),
+  frequency: jsonb("frequency").notNull().default({ type: "daily" }),
+  target: real("target"),
+  unit: text("unit"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -43,11 +47,9 @@ export const habitLogs = pgTable(
       .notNull()
       .references(() => habits.id, { onDelete: "cascade" }),
     logDate: date("log_date").notNull(),
+    amount: real("amount").notNull().default(1),
     createdAt: timestamp("created_at").notNull().defaultNow(),
   },
-  (table) => [
-    unique("habit_logs_date_unique").on(table.habitId, table.logDate),
-  ],
 );
 
 export type Habit = typeof habits.$inferSelect;

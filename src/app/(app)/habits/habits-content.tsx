@@ -1,7 +1,13 @@
 "use client";
 
 import { useMemo } from "react";
-import { computeDueToday, computeStreak, todayDateString } from "@/habits/domain";
+import {
+  computeDueToday,
+  computeProgress,
+  computeStreak,
+  todayDateString,
+} from "@/habits/domain";
+import type { HabitInput } from "@/habits/domain";
 import {
   useArchiveHabit,
   useCheckHabit,
@@ -27,35 +33,56 @@ export function HabitsContent() {
 
   const timezone = settings?.timezone ?? "UTC";
 
-  const dueToday = useMemo(() => {
-    if (!habits) return [];
-    const domainHabits = habits.map((h) => ({
-      id: h.id,
-      name: h.name,
-      description: h.description,
-      archived: h.archived,
-    }));
-    const domainLogs =
-      logs?.map((l) => ({
+  const domainHabits: HabitInput[] = useMemo(
+    () =>
+      (habits ?? []).map((h) => ({
+        id: h.id,
+        name: h.name,
+        description: h.description,
+        archived: h.archived,
+        frequency: h.frequency,
+        target: h.target,
+        unit: h.unit,
+      })),
+    [habits],
+  );
+
+  const domainLogs = useMemo(
+    () =>
+      (logs ?? []).map((l) => ({
         habitId: l.habitId,
         logDate: l.logDate,
-      })) ?? [];
+        amount: l.amount,
+      })),
+    [logs],
+  );
+
+  const dueToday = useMemo(() => {
+    if (!habits) return [];
     return computeDueToday(domainHabits, domainLogs, timezone);
-  }, [habits, logs, timezone]);
+  }, [habits, domainHabits, domainLogs, timezone]);
 
   const streaks = useMemo(() => {
-    if (!logs) return new Map<string, number>();
-    const domainLogs = logs.map((l) => ({
-      habitId: l.habitId,
-      logDate: l.logDate,
-    }));
+    if (!habits || !logs) return new Map<string, number>();
     const habitIds = new Set(logs.map((l) => l.habitId));
     const map = new Map<string, number>();
     for (const habitId of habitIds) {
-      map.set(habitId, computeStreak(habitId, domainLogs, timezone));
+      const habit = domainHabits.find((h) => h.id === habitId);
+      if (habit) {
+        map.set(habitId, computeStreak(habit, domainLogs, timezone));
+      }
     }
     return map;
-  }, [logs, timezone]);
+  }, [habits, logs, domainHabits, domainLogs, timezone]);
+
+  const progressMap = useMemo(() => {
+    const today = todayDateString(timezone);
+    const map = new Map<string, { current: number; target: number | null; unit: string | null }>();
+    for (const habit of domainHabits) {
+      map.set(habit.id, computeProgress(habit, today, domainLogs));
+    }
+    return map;
+  }, [domainHabits, domainLogs, timezone]);
 
   function handleToggle(habitId: string, next: boolean) {
     const logDate = todayDateString(timezone);
@@ -64,6 +91,21 @@ export function HabitsContent() {
     } else {
       uncheckHabit.mutate({ habitId, logDate });
     }
+  }
+
+  function handleAddAmount(habitId: string, amount: number) {
+    const logDate = todayDateString(timezone);
+    checkHabit.mutate({ habitId, logDate, amount });
+  }
+
+  function handleCreate(data: {
+    name: string;
+    description: string | null;
+    frequency: unknown;
+    target: number | null;
+    unit: string | null;
+  }) {
+    createHabit.mutate(data as Parameters<typeof createHabit.mutate>[0]);
   }
 
   if (habitsLoading || logsLoading) {
@@ -76,7 +118,7 @@ export function HabitsContent() {
 
   return (
     <div className="flex flex-col gap-4">
-      <HabitForm onCreate={(name, desc) => createHabit.mutate({ name, description: desc ?? undefined })} loading={createHabit.isPending} />
+      <HabitForm onCreate={handleCreate} loading={createHabit.isPending} />
 
       {dueToday.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16">
@@ -86,21 +128,28 @@ export function HabitsContent() {
         </div>
       ) : (
         <div className="flex flex-col gap-2">
-          {dueToday.map(({ habit, done }) => (
-            <HabitCard
-              key={habit.id}
-              id={habit.id}
-              name={habit.name}
-              description={habit.description}
-              streak={streaks.get(habit.id) ?? 0}
-              done={done}
-              onToggle={(next) => handleToggle(habit.id, next)}
-              onArchive={() => archiveHabit.mutate(habit.id)}
-              onRename={(name, description) =>
-                updateHabit.mutate({ id: habit.id, name, description })
-              }
-            />
-          ))}
+          {dueToday.map(({ habit, done }) => {
+            const progress = progressMap.get(habit.id);
+            return (
+              <HabitCard
+                key={habit.id}
+                id={habit.id}
+                name={habit.name}
+                description={habit.description}
+                streak={streaks.get(habit.id) ?? 0}
+                done={done}
+                target={habit.target}
+                unit={habit.unit}
+                currentAmount={progress?.current ?? 0}
+                onToggle={(next) => handleToggle(habit.id, next)}
+                onArchive={() => archiveHabit.mutate(habit.id)}
+                onRename={(name, description) =>
+                  updateHabit.mutate({ id: habit.id, name, description })
+                }
+                onAddAmount={(amount) => handleAddAmount(habit.id, amount)}
+              />
+            );
+          })}
         </div>
       )}
     </div>
