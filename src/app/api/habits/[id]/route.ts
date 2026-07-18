@@ -1,0 +1,66 @@
+import { NextResponse } from "next/server";
+import { db } from "@/db";
+import { habits } from "@/db/schema";
+import { eq } from "drizzle-orm";
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+  const body = (await request.json()) as {
+    name?: string;
+    description?: string | null;
+    archived?: boolean;
+  };
+
+  const data: Record<string, unknown> = { updatedAt: new Date() };
+  if (body.name !== undefined) data.name = body.name.trim();
+  if (body.description !== undefined) data.description = body.description?.trim() || null;
+  if (body.archived !== undefined) data.archived = body.archived;
+
+  const [row] = await db
+    .update(habits)
+    .set(data)
+    .where(eq(habits.id, id))
+    .returning();
+
+  if (!row) {
+    return NextResponse.json({ error: "Habit not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    archived: row.archived,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  });
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { id } = await params;
+
+  const [row] = await db
+    .update(habits)
+    .set({ archived: true, updatedAt: new Date() })
+    .where(eq(habits.id, id))
+    .returning();
+
+  if (!row) {
+    return NextResponse.json({ error: "Habit not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    archived: row.archived,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  });
+}

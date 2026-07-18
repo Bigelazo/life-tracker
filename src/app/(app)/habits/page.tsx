@@ -1,15 +1,15 @@
 import type { Metadata } from "next";
-import { SectionPage } from "@/components/section-page";
+import { HabitsContent } from "./habits-content";
 
 export const metadata: Metadata = { title: "Habits" };
 
 export default function HabitsPage() {
   return (
-    <SectionPage
-      slug="habits"
-      title="Habits"
-      emptyStateTitle="No habits yet"
-      emptyStateDescription="Track boolean, quantifiable and negative habits with streaks — coming in the habits milestone."
-    />
+    <section>
+      <h1 className="mb-6 text-[28px] leading-[1.2] font-semibold tracking-[-0.6px]">
+        Habits
+      </h1>
+      <HabitsContent />
+    </section>
   );
 }
