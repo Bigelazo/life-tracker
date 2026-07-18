@@ -49,8 +49,8 @@ export function CommandPalette() {
       open={open}
       onOpenChange={setOpen}
       label="Command palette"
-      contentClassName="bg-surface-2 border-hairline rounded-lg border shadow-2xl"
-      overlayClassName="bg-black/60"
+      contentClassName="bg-surface-2 border-hairline rounded-lg border shadow-2xl fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-lg"
+      overlayClassName="bg-black/60 fixed inset-0"
     >
       <CommandInput
         placeholder="Type a command or search…"
