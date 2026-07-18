@@ -25,7 +25,7 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
-      testMatch: /smoke\.spec\.ts/,
+      testMatch: /(smoke|dashboard)\.spec\.ts/,
       dependencies: ["setup"],
     },
     {
@@ -47,7 +47,7 @@ export default defineConfig({
     {
       name: "mobile",
       use: { ...devices["Pixel 7"] },
-      testMatch: /smoke\.spec\.ts/,
+      testMatch: /(smoke|dashboard)\.spec\.ts/,
       dependencies: ["setup"],
     },
   ],
