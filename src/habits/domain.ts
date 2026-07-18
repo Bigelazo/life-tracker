@@ -82,12 +82,11 @@ export function isDueOnDate(
 
   if (freq.type === "times_per_week") {
     const weekStart = getWeekStart(dateStr);
-    const weekEnd = addDays(weekStart, 6);
     const weekLogs = logs.filter(
       (l) =>
         l.habitId === habit.id &&
         l.logDate >= weekStart &&
-        l.logDate <= weekEnd,
+        l.logDate < dateStr,
     );
     const completedDays = new Set(weekLogs.map((l) => l.logDate)).size;
     return completedDays < freq.times;
@@ -148,16 +147,9 @@ export function computeStreak(
 ): number {
   const today = formatDate(now ?? new Date(), timezone);
 
-  const todayLogs = logs.filter(
-    (l) => l.habitId === habit.id && l.logDate === today,
-  );
   const todayComplete = isCompleteOnDate(habit, today, logs);
 
-  if (habit.frequency.type === "daily" || habit.frequency.type === "fixed_weekdays") {
-    if (!todayComplete && isDueOnDate(habit, today, logs)) return 0;
-  } else {
-    if (todayLogs.length === 0) return 0;
-  }
+  if (!todayComplete && isDueOnDate(habit, today, logs)) return 0;
 
   let streak = 0;
   let cursor = today;

@@ -102,6 +102,7 @@ export function HabitForm({ onCreate, loading }: HabitFormProps) {
         value={desc}
         onChange={(e) => setDesc(e.target.value)}
         onKeyDown={(e) => {
+          if (e.key === "Enter") handleSubmit();
           if (e.key === "Escape") {
             setName("");
             setDesc("");

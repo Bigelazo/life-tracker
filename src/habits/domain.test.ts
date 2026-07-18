@@ -309,6 +309,30 @@ describe("computeStreak", () => {
     const saturday = new Date("2026-07-18T12:00:00Z");
     expect(computeStreak(gym, [], "UTC", saturday)).toBe(0);
   });
+
+  it("times_per_week: streak survives on non-due day when quota met", () => {
+    const gym = h({
+      frequency: { type: "times_per_week", times: 2 },
+    });
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-13"),
+      log(HABIT_ID, "2026-07-14"),
+    ];
+    const saturday = new Date("2026-07-18T12:00:00Z");
+    expect(computeStreak(gym, logs, "UTC", saturday)).toBe(2);
+  });
+
+  it("times_per_week: streak breaks when quota not met on due Friday", () => {
+    const gym = h({
+      frequency: { type: "times_per_week", times: 3 },
+    });
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-13"),
+      log(HABIT_ID, "2026-07-14"),
+    ];
+    const friday = new Date("2026-07-17T12:00:00Z");
+    expect(computeStreak(gym, logs, "UTC", friday)).toBe(0);
+  });
 });
 
 describe("quantifiable habits", () => {
