@@ -1,5 +1,7 @@
+export type SectionSlug = "today" | "habits" | "finance" | "notes";
+
 export type Section = {
-  slug: string;
+  slug: SectionSlug;
   label: string;
   href: string;
 };

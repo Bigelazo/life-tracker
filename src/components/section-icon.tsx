@@ -1,6 +1,7 @@
 import type { SVGProps } from "react";
+import type { SectionSlug } from "@/lib/sections";
 
-const paths: Record<string, string> = {
+const paths: Record<SectionSlug, string> = {
   today:
     "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z",
   habits: "M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3",
@@ -13,7 +14,7 @@ const paths: Record<string, string> = {
 export function SectionIcon({
   slug,
   ...props
-}: { slug: string } & SVGProps<SVGSVGElement>) {
+}: { slug: SectionSlug } & SVGProps<SVGSVGElement>) {
   return (
     <svg
       viewBox="0 0 24 24"
@@ -25,7 +26,7 @@ export function SectionIcon({
       aria-hidden
       {...props}
     >
-      <path d={paths[slug] ?? paths.notes} />
+      <path d={paths[slug]} />
     </svg>
   );
 }

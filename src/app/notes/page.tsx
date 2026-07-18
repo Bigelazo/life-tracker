@@ -1,17 +1,15 @@
 import type { Metadata } from "next";
-import { EmptyState } from "@/components/empty-state";
+import { SectionPage } from "@/components/section-page";
 
 export const metadata: Metadata = { title: "Notes" };
 
 export default function NotesPage() {
   return (
-    <section>
-      <h1 className="mb-6 text-2xl">Notes</h1>
-      <EmptyState
-        slug="notes"
-        title="No pages yet"
-        description="Markdown pages with wikilinks, backlinks and full-text search — coming in the notes milestone."
-      />
-    </section>
+    <SectionPage
+      slug="notes"
+      title="Notes"
+      emptyStateTitle="No pages yet"
+      emptyStateDescription="Markdown pages with wikilinks, backlinks and full-text search — coming in the notes milestone."
+    />
   );
 }

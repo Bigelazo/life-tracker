@@ -60,7 +60,7 @@ export function AppNav() {
                 <Link
                   href={section.href}
                   aria-current={active ? "page" : undefined}
-                  className={`flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] transition-colors ${
+                  className={`flex min-h-14 flex-col items-center justify-center gap-1 text-xs transition-colors ${
                     active ? "text-ink" : "text-ink-tertiary"
                   }`}
                 >
