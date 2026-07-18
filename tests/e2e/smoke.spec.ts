@@ -1,6 +1,8 @@
 import { expect, test } from "@playwright/test";
 
-test("the app opens on the Today section", async ({ page }) => {
+test("a signed-in owner opens the app on the Today section", async ({
+  page,
+}) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/today$/);
   await expect(
@@ -8,7 +10,7 @@ test("the app opens on the Today section", async ({ page }) => {
   ).toBeVisible();
 });
 
-test("all four sections are reachable from the navigation", async ({
+test("a signed-in owner reaches all four sections from the navigation", async ({
   page,
 }) => {
   await page.goto("/today");
@@ -35,4 +37,22 @@ test("the PWA manifest is served with the canvas theme color", async ({
   expect(manifest.theme_color).toBe("#010102");
   expect(manifest.background_color).toBe("#010102");
   expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
+});
+
+test("sign-out clears the session and re-gates the app", async ({ page }) => {
+  await page.goto("/today");
+  await expect(
+    page.getByRole("heading", { name: "Today", level: 1 }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+
+  await expect(page).toHaveURL(/\/login(\?|$)/);
+  await expect(
+    page.getByRole("heading", { name: "Sign in", level: 1 }),
+  ).toBeVisible();
+
+  // Re-gates: every protected route bounces back to /login after sign-out.
+  await page.goto("/today");
+  await expect(page).toHaveURL(/\/login(\?|$)/);
 });

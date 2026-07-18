@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SECTIONS } from "@/lib/sections";
 import { SectionIcon } from "@/components/section-icon";
+import { SignOutButton } from "@/components/sign-out-button";
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -45,6 +46,9 @@ export function AppNav() {
             );
           })}
         </ul>
+        <div className="mt-auto px-3 pb-6">
+          <SignOutButton />
+        </div>
       </nav>
 
       {/* Mobile: bottom tab bar */}
@@ -72,6 +76,11 @@ export function AppNav() {
           })}
         </ul>
       </nav>
+
+      {/* Mobile: sign-out pinned to the top-right of every app screen */}
+      <div className="fixed top-3 right-3 z-50 md:hidden">
+        <SignOutButton className="bg-surface-1 border border-hairline px-3.5" />
+      </div>
     </>
   );
 }

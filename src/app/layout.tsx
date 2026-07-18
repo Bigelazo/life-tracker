@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Inter } from "next/font/google";
-import { AppNav } from "@/components/app-nav";
 import "./globals.css";
 
 const inter = Inter({
@@ -36,14 +35,7 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="bg-canvas text-ink min-h-full">
-        <div className="flex min-h-screen">
-          <AppNav />
-          <main className="flex-1 px-4 pt-6 pb-24 md:px-8 md:pt-8 md:pb-8">
-            {children}
-          </main>
-        </div>
-      </body>
+      <body className="bg-canvas text-ink min-h-full">{children}</body>
     </html>
   );
 }
