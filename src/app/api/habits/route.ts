@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { habits } from "@/db/schema";
+import { coerceFrequency } from "@/habits/domain";
 import { asc } from "drizzle-orm";
 
 export async function GET() {
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Name is required" }, { status: 400 });
   }
 
-  const frequency = validFrequency(body.frequency);
+  const frequency = coerceFrequency(body.frequency);
 
   const [row] = await db
     .insert(habits)
@@ -65,21 +66,3 @@ export async function POST(request: Request) {
   );
 }
 
-function validFrequency(f: unknown) {
-  if (!f || typeof f !== "object") return { type: "daily" };
-  const obj = f as Record<string, unknown>;
-  if (obj.type === "times_per_week") {
-    const times = Number(obj.times);
-    if (times >= 1 && times <= 6 && Number.isInteger(times)) {
-      return { type: "times_per_week", times };
-    }
-    return { type: "daily" };
-  }
-  if (obj.type === "fixed_weekdays") {
-    if (Array.isArray(obj.days) && obj.days.length > 0 && obj.days.every((d: unknown) => typeof d === "number" && d >= 0 && d <= 6 && Number.isInteger(d))) {
-      return { type: "fixed_weekdays", days: obj.days as number[] };
-    }
-    return { type: "daily" };
-  }
-  return { type: "daily" };
-}
