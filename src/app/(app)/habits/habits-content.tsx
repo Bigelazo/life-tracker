@@ -26,8 +26,8 @@ import { HabitCard } from "@/components/habit-card";
 import { HabitForm } from "@/components/habit-form";
 
 export function HabitsContent() {
-  const { data: habits, isLoading: habitsLoading } = useHabits();
-  const { data: logs, isLoading: logsLoading } = useHabitLogs();
+  const { data: habits, isLoading: habitsLoading, isError: habitsError, error: habitsErr } = useHabits();
+  const { data: logs, isLoading: logsLoading, isError: logsError } = useHabitLogs();
   const { data: relapseRecords } = useAllRelapses();
   const { data: settings } = useSettings();
   const createHabit = useCreateHabit();
@@ -150,6 +150,21 @@ export function HabitsContent() {
     return (
       <div className="flex items-center justify-center py-16">
         <p className="text-[#8a8f98] text-[14px] leading-[1.5]">Loading...</p>
+      </div>
+    );
+  }
+
+  if (habitsError || logsError) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-16">
+        <p className="text-[#8a8f98] text-[14px] leading-[1.5]">
+          Failed to load habits. Check that the database migration has been applied.
+        </p>
+        {habitsErr && (
+          <p className="text-[#62666d] text-[12px] leading-[1.4]">
+            {(habitsErr as Error).message}
+          </p>
+        )}
       </div>
     );
   }

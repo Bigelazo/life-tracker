@@ -185,6 +185,8 @@ export function useAllRelapses() {
   return useQuery({
     queryKey: ["all-habit-relapses"],
     queryFn: () => fetchJSON<RelapseResponse[]>("/api/habits/relapses"),
+    staleTime: 5 * 60_000,
+    retry: false,
   });
 }
 
