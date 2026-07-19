@@ -13,10 +13,13 @@ interface HabitCardProps {
   target: number | null;
   unit: string | null;
   currentAmount: number;
+  isNegative: boolean;
+  elapsed: string | null;
   onToggle: (done: boolean) => void;
   onArchive: () => void;
   onRename: (name: string, description: string | null) => void;
   onAddAmount: (amount: number) => void;
+  onRelapse: () => void;
 }
 
 export function HabitCard({
@@ -27,16 +30,20 @@ export function HabitCard({
   target,
   unit,
   currentAmount,
+  isNegative,
+  elapsed,
   onToggle,
   onArchive,
   onRename,
   onAddAmount,
+  onRelapse,
 }: HabitCardProps) {
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(name);
   const [editDesc, setEditDesc] = useState(description ?? "");
   const [addingAmount, setAddingAmount] = useState(false);
   const [amountValue, setAmountValue] = useState("");
+  const [confirmingRelapse, setConfirmingRelapse] = useState(false);
 
   const isQuantifiable = target !== null;
 
@@ -68,7 +75,23 @@ export function HabitCard({
 
   return (
     <div className="border-hairline bg-surface-1 rounded-lg flex items-start gap-3 border p-4 transition-colors group">
-      {isQuantifiable ? (
+      {isNegative ? (
+        <div className="flex flex-col items-center gap-1.5 shrink-0">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirmingRelapse(true);
+            }}
+            className="mt-0 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border transition-colors"
+            style={{
+              borderColor: "#34343a",
+              backgroundColor: "transparent",
+            }}
+            aria-label={`Relapse on ${name}`}
+          />
+        </div>
+      ) : isQuantifiable ? (
         <div className="flex flex-col items-center gap-1.5 shrink-0">
           <button
             type="button"
@@ -99,7 +122,33 @@ export function HabitCard({
       )}
 
       <div className="min-w-0 flex-1">
-        {editing ? (
+        {confirmingRelapse ? (
+          <div className="flex flex-col gap-2">
+            <p className="text-[14px] leading-[1.5] text-[#f7f8f8]">
+              Relapse on &ldquo;{name}&rdquo;? This resets your counter.
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onRelapse();
+                  setConfirmingRelapse(false);
+                }}
+                className="rounded-md px-3 py-1 text-[14px] font-medium leading-[1.2] text-white transition-colors"
+                style={{ backgroundColor: "#5e6ad2" }}
+              >
+                Confirm relapse
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmingRelapse(false)}
+                className="border-hairline bg-surface-1 rounded-md border px-3 py-1 text-[14px] font-medium leading-[1.2] text-[#f7f8f8] transition-colors hover:bg-surface-2"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : editing ? (
           <div className="flex flex-col gap-2">
             <input
               type="text"
@@ -151,11 +200,15 @@ export function HabitCard({
               >
                 {name}
               </span>
-              {streak > 1 && (
+              {isNegative && elapsed ? (
+                <span className="bg-surface-2 text-[#8a8f98] rounded-full px-2 py-0.5 text-[11px] leading-[1.4] font-medium">
+                  {elapsed}
+                </span>
+              ) : streak > 1 ? (
                 <span className="bg-surface-2 text-[#8a8f98] rounded-full px-2 py-0.5 text-[11px] leading-[1.4] font-medium">
                   {streak} days
                 </span>
-              )}
+              ) : null}
             </div>
             {description && (
               <p

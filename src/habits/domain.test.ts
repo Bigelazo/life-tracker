@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   computeDueToday,
+  computeElapsedSince,
   computeProgress,
   computeStreak,
+  formatElapsed,
   isCompleteOnDate,
+  isDueOnDate,
   todayDateString,
 } from "./domain";
-import type { HabitInput, HabitLogInput } from "./domain";
+import type { HabitInput, HabitLogInput, RelapseInput } from "./domain";
 
 function habit(
   overrides: Partial<HabitInput> & { id: string; name: string },
@@ -14,9 +17,11 @@ function habit(
   return {
     description: null,
     archived: false,
+    habitType: "positive",
     frequency: { type: "daily" },
     target: null,
     unit: null,
+    createdAt: "2026-07-18T00:00:00Z",
     ...overrides,
   };
 }
@@ -436,5 +441,183 @@ describe("quantifiable habits", () => {
     ];
     const now = new Date("2026-07-18T12:00:00Z");
     expect(computeStreak(water, logs, "UTC", now)).toBe(0);
+  });
+});
+
+describe("negative habits", () => {
+  const NEG_ID = "neg-1";
+
+  function nh(overrides?: Partial<HabitInput>): HabitInput {
+    return habit({
+      id: NEG_ID,
+      name: "No caffeine",
+      habitType: "negative",
+      ...overrides,
+    });
+  }
+
+  function relapse(
+    overrides: Partial<RelapseInput> & { id: string },
+  ): RelapseInput {
+    return {
+      habitId: NEG_ID,
+      relapsedAt: "2026-07-18T08:00:00Z",
+      ...overrides,
+    };
+  }
+
+  it("isDueOnDate returns true for active negative habits", () => {
+    const neg = nh();
+    expect(isDueOnDate(neg, "2026-07-18", [])).toBe(true);
+  });
+
+  it("isDueOnDate returns false for archived negative habits", () => {
+    const neg = nh({ archived: true });
+    expect(isDueOnDate(neg, "2026-07-18", [])).toBe(false);
+  });
+
+  it("isCompleteOnDate always returns false for negative habits", () => {
+    const neg = nh();
+    expect(isCompleteOnDate(neg, "2026-07-18", [])).toBe(false);
+  });
+
+  it("computeDueToday includes negative habits", () => {
+    const habits: HabitInput[] = [nh()];
+    const now = new Date("2026-07-18T12:00:00Z");
+    const result = computeDueToday(habits, [], "UTC", now);
+    expect(result).toHaveLength(1);
+    expect(result[0].habit.id).toBe(NEG_ID);
+    expect(result[0].done).toBe(false);
+  });
+
+  it("computeDueToday excludes archived negative habits", () => {
+    const habits: HabitInput[] = [nh({ archived: true })];
+    const now = new Date("2026-07-18T12:00:00Z");
+    const result = computeDueToday(habits, [], "UTC", now);
+    expect(result).toHaveLength(0);
+  });
+
+  it("computeStreak returns 0 for negative habits", () => {
+    const neg = nh();
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(computeStreak(neg, [], "UTC", now)).toBe(0);
+  });
+
+  describe("computeElapsedSince", () => {
+    it("computes elapsed since creation when no relapses", () => {
+      const neg = nh({ createdAt: "2026-07-17T10:00:00Z" });
+      const now = new Date("2026-07-18T14:00:00Z");
+      const elapsed = computeElapsedSince(neg, [], now);
+      expect(elapsed).toEqual({ days: 1, hours: 4 });
+    });
+
+    it("computes elapsed since creation same-day", () => {
+      const neg = nh({ createdAt: "2026-07-18T10:00:00Z" });
+      const now = new Date("2026-07-18T14:00:00Z");
+      const elapsed = computeElapsedSince(neg, [], now);
+      expect(elapsed).toEqual({ days: 0, hours: 4 });
+    });
+
+    it("computes elapsed since latest relapse (first relapse)", () => {
+      const neg = nh({ createdAt: "2026-07-15T10:00:00Z" });
+      const relapses: RelapseInput[] = [
+        relapse({ id: "r1", relapsedAt: "2026-07-17T12:00:00Z" }),
+      ];
+      const now = new Date("2026-07-18T14:00:00Z");
+      const elapsed = computeElapsedSince(neg, relapses, now);
+      expect(elapsed).toEqual({ days: 1, hours: 2 });
+    });
+
+    it("computes elapsed since latest relapse (consecutive relapses)", () => {
+      const neg = nh({ createdAt: "2026-07-15T10:00:00Z" });
+      const relapses: RelapseInput[] = [
+        relapse({ id: "r1", relapsedAt: "2026-07-16T12:00:00Z" }),
+        relapse({ id: "r2", relapsedAt: "2026-07-17T08:00:00Z" }),
+        relapse({ id: "r3", relapsedAt: "2026-07-18T10:00:00Z" }),
+      ];
+      const now = new Date("2026-07-18T14:00:00Z");
+      const elapsed = computeElapsedSince(neg, relapses, now);
+      expect(elapsed).toEqual({ days: 0, hours: 4 });
+    });
+
+    it("resets counter immediately after relapse (same second)", () => {
+      const neg = nh({ createdAt: "2026-07-15T10:00:00Z" });
+      const relapses: RelapseInput[] = [
+        relapse({ id: "r1", relapsedAt: "2026-07-18T14:00:00Z" }),
+      ];
+      const now = new Date("2026-07-18T14:00:00Z");
+      const elapsed = computeElapsedSince(neg, relapses, now);
+      expect(elapsed).toEqual({ days: 0, hours: 0 });
+    });
+
+    it("handles multiple relapses correctly (picks latest)", () => {
+      const neg = nh({ createdAt: "2026-07-15T10:00:00Z" });
+      const relapses: RelapseInput[] = [
+        relapse({ id: "r1", relapsedAt: "2026-07-16T09:00:00Z" }),
+        relapse({ id: "r2", relapsedAt: "2026-07-17T10:00:00Z" }),
+        // r3 is earlier than r2 — should be ignored
+        relapse({ id: "r3", relapsedAt: "2026-07-16T18:00:00Z" }),
+      ];
+      const now = new Date("2026-07-18T10:00:00Z");
+      const elapsed = computeElapsedSince(neg, relapses, now);
+      expect(elapsed).toEqual({ days: 1, hours: 0 });
+    });
+
+    it("crosses day boundaries correctly", () => {
+      const neg = nh({ createdAt: "2026-07-17T22:00:00Z" });
+      const now = new Date("2026-07-18T02:00:00Z");
+      const elapsed = computeElapsedSince(neg, [], now);
+      expect(elapsed).toEqual({ days: 0, hours: 4 });
+    });
+  });
+
+  describe("formatElapsed", () => {
+    it("formats days only", () => {
+      expect(formatElapsed({ days: 3, hours: 0 })).toBe("3 days");
+    });
+
+    it("formats days and hours", () => {
+      expect(formatElapsed({ days: 2, hours: 5 })).toBe("2 days 5 hr");
+    });
+
+    it("formats single day", () => {
+      expect(formatElapsed({ days: 1, hours: 0 })).toBe("1 day");
+    });
+
+    it("formats single day with hours", () => {
+      expect(formatElapsed({ days: 1, hours: 3 })).toBe("1 day 3 hr");
+    });
+
+    it("formats hours only", () => {
+      expect(formatElapsed({ days: 0, hours: 6 })).toBe("6 hr");
+    });
+
+    it("formats single hour", () => {
+      expect(formatElapsed({ days: 0, hours: 1 })).toBe("1 hr");
+    });
+
+    it("formats zero (just relapsed)", () => {
+      expect(formatElapsed({ days: 0, hours: 0 })).toBe("now");
+    });
+  });
+
+  describe("coerceHabitType", () => {
+    it("defaults to positive for invalid input", async () => {
+      const { coerceHabitType } = await import("./domain");
+      expect(coerceHabitType(null)).toBe("positive");
+      expect(coerceHabitType(undefined)).toBe("positive");
+      expect(coerceHabitType("invalid")).toBe("positive");
+      expect(coerceHabitType({})).toBe("positive");
+    });
+
+    it("returns negative for 'negative'", async () => {
+      const { coerceHabitType } = await import("./domain");
+      expect(coerceHabitType("negative")).toBe("negative");
+    });
+
+    it("returns positive for 'positive'", async () => {
+      const { coerceHabitType } = await import("./domain");
+      expect(coerceHabitType("positive")).toBe("positive");
+    });
   });
 });

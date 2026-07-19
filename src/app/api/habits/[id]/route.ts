@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { habits } from "@/db/schema";
-import { coerceFrequency } from "@/habits/domain";
+import { coerceFrequency, coerceHabitType } from "@/habits/domain";
 import { eq } from "drizzle-orm";
 
 export async function PATCH(
@@ -13,6 +13,7 @@ export async function PATCH(
     name?: string;
     description?: string | null;
     archived?: boolean;
+    habitType?: unknown;
     frequency?: unknown;
     target?: number | null;
     unit?: string | null;
@@ -22,6 +23,7 @@ export async function PATCH(
   if (body.name !== undefined) data.name = body.name.trim();
   if (body.description !== undefined) data.description = body.description?.trim() || null;
   if (body.archived !== undefined) data.archived = body.archived;
+  if (body.habitType !== undefined) data.habitType = coerceHabitType(body.habitType);
   if (body.frequency !== undefined) data.frequency = coerceFrequency(body.frequency);
   if (body.target !== undefined) data.target = body.target;
   if (body.unit !== undefined) data.unit = body.unit?.trim() || null;
@@ -41,6 +43,7 @@ export async function PATCH(
     name: row.name,
     description: row.description,
     archived: row.archived,
+    habitType: row.habitType,
     frequency: row.frequency,
     target: row.target,
     unit: row.unit,
@@ -70,6 +73,7 @@ export async function DELETE(
     name: row.name,
     description: row.description,
     archived: row.archived,
+    habitType: row.habitType,
     frequency: row.frequency,
     target: row.target,
     unit: row.unit,

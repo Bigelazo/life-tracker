@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { HabitLogResponse, HabitResponse } from "./api-types";
-import type { HabitFrequency } from "./domain";
+import type { HabitLogResponse, HabitResponse, RelapseResponse } from "./api-types";
+import type { HabitFrequency, HabitType } from "./domain";
 
 export function useSettings() {
   return useQuery({
@@ -39,6 +39,7 @@ export function useCreateHabit() {
     mutationFn: (data: {
       name: string;
       description?: string;
+      habitType?: HabitType;
       frequency?: HabitFrequency;
       target?: number | null;
       unit?: string | null;
@@ -67,6 +68,7 @@ export function useUpdateHabit() {
       name?: string;
       description?: string | null;
       archived?: boolean;
+      habitType?: HabitType;
       frequency?: HabitFrequency;
       target?: number | null;
       unit?: string | null;
@@ -175,6 +177,61 @@ export function useUncheckHabit() {
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["habit-logs"] });
+    },
+  });
+}
+
+export function useAllRelapses() {
+  return useQuery({
+    queryKey: ["all-habit-relapses"],
+    queryFn: () => fetchJSON<RelapseResponse[]>("/api/habits/relapses"),
+  });
+}
+
+export function useRecordRelapse() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      habitId,
+      relapsedAt,
+    }: {
+      habitId: string;
+      relapsedAt?: string;
+    }) =>
+      fetchJSON<RelapseResponse>(`/api/habits/${habitId}/relapses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ relapsedAt }),
+      }),
+    onMutate: async ({ habitId }) => {
+      await qc.cancelQueries({ queryKey: ["habit-relapses", habitId] });
+      await qc.cancelQueries({ queryKey: ["all-habit-relapses"] });
+      const previous = qc.getQueryData<RelapseResponse[]>(["habit-relapses", habitId]);
+      const allPrevious = qc.getQueryData<RelapseResponse[]>(["all-habit-relapses"]);
+      const optimistic: RelapseResponse = {
+        id: `optimistic-${habitId}-${Date.now()}`,
+        habitId,
+        relapsedAt: new Date().toISOString(),
+      };
+      qc.setQueryData<RelapseResponse[]>(["habit-relapses", habitId], (old) =>
+        old ? [optimistic, ...old] : [optimistic],
+      );
+      qc.setQueryData<RelapseResponse[]>(["all-habit-relapses"], (old) =>
+        old ? [optimistic, ...old] : [optimistic],
+      );
+      return { previous, allPrevious };
+    },
+    onError: (_err, { habitId }, context) => {
+      if (context?.previous) {
+        qc.setQueryData(["habit-relapses", habitId], context.previous);
+      }
+      if (context?.allPrevious) {
+        qc.setQueryData(["all-habit-relapses"], context.allPrevious);
+      }
+    },
+    onSettled: (_data, _err, { habitId }) => {
+      qc.invalidateQueries({ queryKey: ["habit-relapses", habitId] });
+      qc.invalidateQueries({ queryKey: ["all-habit-relapses"] });
     },
   });
 }

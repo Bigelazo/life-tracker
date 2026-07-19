@@ -32,6 +32,7 @@ export const habits = pgTable("habits", {
   name: text("name").notNull(),
   description: text("description"),
   archived: boolean("archived").notNull().default(false),
+  habitType: text("habit_type").notNull().default("positive"),
   frequency: jsonb("frequency").notNull().default({ type: "daily" }),
   target: real("target"),
   unit: text("unit"),
@@ -52,7 +53,20 @@ export const habitLogs = pgTable(
   },
 );
 
+export const habitRelapses = pgTable(
+  "habit_relapses",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    habitId: uuid("habit_id")
+      .notNull()
+      .references(() => habits.id, { onDelete: "cascade" }),
+    relapsedAt: timestamp("relapsed_at").notNull().defaultNow(),
+  },
+);
+
 export type Habit = typeof habits.$inferSelect;
 export type NewHabit = typeof habits.$inferInsert;
 export type HabitLog = typeof habitLogs.$inferSelect;
 export type NewHabitLog = typeof habitLogs.$inferInsert;
+export type HabitRelapse = typeof habitRelapses.$inferSelect;
+export type NewHabitRelapse = typeof habitRelapses.$inferInsert;

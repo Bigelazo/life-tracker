@@ -1,19 +1,23 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   computeDueToday,
+  computeElapsedSince,
   computeProgress,
   computeStreak,
+  formatElapsed,
   todayDateString,
 } from "@/habits/domain";
-import type { HabitInput } from "@/habits/domain";
+import type { HabitInput, RelapseInput } from "@/habits/domain";
 import {
+  useAllRelapses,
   useArchiveHabit,
   useCheckHabit,
   useCreateHabit,
   useHabitLogs,
   useHabits,
+  useRecordRelapse,
   useSettings,
   useUncheckHabit,
   useUpdateHabit,
@@ -24,14 +28,22 @@ import { HabitForm } from "@/components/habit-form";
 export function HabitsContent() {
   const { data: habits, isLoading: habitsLoading } = useHabits();
   const { data: logs, isLoading: logsLoading } = useHabitLogs();
+  const { data: relapseRecords } = useAllRelapses();
   const { data: settings } = useSettings();
   const createHabit = useCreateHabit();
   const updateHabit = useUpdateHabit();
   const archiveHabit = useArchiveHabit();
   const checkHabit = useCheckHabit();
   const uncheckHabit = useUncheckHabit();
+  const recordRelapse = useRecordRelapse();
 
+  const [tick, setTick] = useState(0);
   const timezone = settings?.timezone ?? "UTC";
+
+  useEffect(() => {
+    const interval = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(interval);
+  }, []);
 
   const domainHabits: HabitInput[] = useMemo(
     () =>
@@ -40,9 +52,11 @@ export function HabitsContent() {
         name: h.name,
         description: h.description,
         archived: h.archived,
+        habitType: h.habitType,
         frequency: h.frequency,
         target: h.target,
         unit: h.unit,
+        createdAt: h.createdAt,
       })),
     [habits],
   );
@@ -55,6 +69,16 @@ export function HabitsContent() {
         amount: l.amount,
       })),
     [logs],
+  );
+
+  const domainRelapses: RelapseInput[] = useMemo(
+    () =>
+      (relapseRecords ?? []).map((r) => ({
+        id: r.id,
+        habitId: r.habitId,
+        relapsedAt: r.relapsedAt,
+      })),
+    [relapseRecords],
   );
 
   const dueToday = useMemo(() => {
@@ -84,6 +108,19 @@ export function HabitsContent() {
     return map;
   }, [domainHabits, domainLogs, timezone]);
 
+  const elapsedMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const now = new Date();
+    for (const habit of domainHabits) {
+      if (habit.habitType === "negative") {
+        const elapsed = computeElapsedSince(habit, domainRelapses, now);
+        map.set(habit.id, formatElapsed(elapsed));
+      }
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [domainHabits, domainRelapses, tick]);
+
   function handleToggle(habitId: string, next: boolean) {
     const logDate = todayDateString(timezone);
     if (next) {
@@ -101,6 +138,7 @@ export function HabitsContent() {
   function handleCreate(data: {
     name: string;
     description: string | null;
+    habitType: unknown;
     frequency: unknown;
     target: number | null;
     unit: string | null;
@@ -130,6 +168,7 @@ export function HabitsContent() {
         <div className="flex flex-col gap-2">
           {dueToday.map(({ habit, done }) => {
             const progress = progressMap.get(habit.id);
+            const isNegative = habit.habitType === "negative";
             return (
               <HabitCard
                 key={habit.id}
@@ -141,12 +180,17 @@ export function HabitsContent() {
                 target={habit.target}
                 unit={habit.unit}
                 currentAmount={progress?.current ?? 0}
+                isNegative={isNegative}
+                elapsed={isNegative ? (elapsedMap.get(habit.id) ?? null) : null}
                 onToggle={(next) => handleToggle(habit.id, next)}
                 onArchive={() => archiveHabit.mutate(habit.id)}
                 onRename={(name, description) =>
                   updateHabit.mutate({ id: habit.id, name, description })
                 }
                 onAddAmount={(amount) => handleAddAmount(habit.id, amount)}
+                onRelapse={() =>
+                  recordRelapse.mutate({ habitId: habit.id })
+                }
               />
             );
           })}

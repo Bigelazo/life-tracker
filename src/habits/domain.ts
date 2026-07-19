@@ -3,20 +3,30 @@ export type HabitFrequency =
   | { type: "times_per_week"; times: number }
   | { type: "fixed_weekdays"; days: number[] };
 
+export type HabitType = "positive" | "negative";
+
 export interface HabitInput {
   id: string;
   name: string;
   description: string | null;
   archived: boolean;
+  habitType: HabitType;
   frequency: HabitFrequency;
   target: number | null;
   unit: string | null;
+  createdAt: string;
 }
 
 export interface HabitLogInput {
   habitId: string;
   logDate: string;
   amount: number;
+}
+
+export interface RelapseInput {
+  id: string;
+  habitId: string;
+  relapsedAt: string;
 }
 
 interface DateInfo {
@@ -70,6 +80,8 @@ export function isDueOnDate(
   logs: HabitLogInput[],
 ): boolean {
   if (habit.archived) return false;
+
+  if (habit.habitType === "negative") return true;
 
   const freq = habit.frequency;
 
@@ -126,6 +138,8 @@ export function isCompleteOnDate(
   dateStr: string,
   logs: HabitLogInput[],
 ): boolean {
+  if (habit.habitType === "negative") return false;
+
   const dayLogs = logs.filter(
     (l) => l.habitId === habit.id && l.logDate === dateStr,
   );
@@ -145,6 +159,8 @@ export function computeStreak(
   timezone: string,
   now?: Date,
 ): number {
+  if (habit.habitType === "negative") return 0;
+
   const today = formatDate(now ?? new Date(), timezone);
 
   const todayComplete = isCompleteOnDate(habit, today, logs);
@@ -187,4 +203,50 @@ export function coerceFrequency(f: unknown): HabitFrequency {
     return { type: "daily" };
   }
   return { type: "daily" };
+}
+
+export function coerceHabitType(t: unknown): HabitType {
+  if (t === "negative") return "negative";
+  return "positive";
+}
+
+export interface ElapsedTime {
+  days: number;
+  hours: number;
+}
+
+export function computeElapsedSince(
+  habit: HabitInput,
+  relapses: RelapseInput[],
+  now?: Date,
+): ElapsedTime {
+  const nowDate = now ?? new Date();
+  const latestRelapse = relapses
+    .filter((r) => r.habitId === habit.id)
+    .sort((a, b) => new Date(b.relapsedAt).getTime() - new Date(a.relapsedAt).getTime())[0];
+
+  const referenceDate = latestRelapse
+    ? new Date(latestRelapse.relapsedAt)
+    : new Date(habit.createdAt);
+
+  const diffMs = nowDate.getTime() - referenceDate.getTime();
+  const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+
+  return { days, hours };
+}
+
+export function formatElapsed(elapsed: ElapsedTime): string {
+  if (elapsed.days > 0) {
+    const dayPart = `${elapsed.days} day${elapsed.days !== 1 ? "s" : ""}`;
+    if (elapsed.hours > 0) {
+      return `${dayPart} ${elapsed.hours} hr`;
+    }
+    return dayPart;
+  }
+  if (elapsed.hours > 0) {
+    return `${elapsed.hours} hr`;
+  }
+  return "now";
 }
