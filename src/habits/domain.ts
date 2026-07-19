@@ -250,3 +250,152 @@ export function formatElapsed(elapsed: ElapsedTime): string {
   }
   return "now";
 }
+
+export function computeBestStreak(
+  habit: HabitInput,
+  logs: HabitLogInput[],
+  timezone: string,
+  now?: Date,
+): number {
+  if (habit.habitType === "negative") return 0;
+
+  const today = formatDate(now ?? new Date(), timezone);
+  const createdAtDate = formatDate(new Date(habit.createdAt), timezone);
+
+  let best = 0;
+  let current = 0;
+  let cursor = createdAtDate;
+
+  const safety = 80_000;
+  let i = 0;
+  while (i < safety) {
+    if (cursor > today) break;
+
+    if (isDueOnDate(habit, cursor, logs)) {
+      if (isCompleteOnDate(habit, cursor, logs)) {
+        current++;
+        if (current > best) best = current;
+      } else {
+        current = 0;
+      }
+    }
+
+    cursor = addDays(cursor, 1);
+    i++;
+  }
+
+  return best;
+}
+
+export interface CompletionRate {
+  completed: number;
+  due: number;
+  rate: number;
+}
+
+export function computeCompletionRate(
+  habit: HabitInput,
+  logs: HabitLogInput[],
+  startDate: string,
+  endDate: string,
+  timezone: string,
+  now?: Date,
+): CompletionRate {
+  if (habit.habitType === "negative") {
+    return { completed: 0, due: 0, rate: 0 };
+  }
+
+  const today = formatDate(now ?? new Date(), timezone);
+  const createdAtDate = formatDate(new Date(habit.createdAt), timezone);
+
+  const effectiveStart = startDate > createdAtDate ? startDate : createdAtDate;
+  const effectiveEnd = endDate < today ? endDate : today;
+
+  if (effectiveStart > effectiveEnd) {
+    return { completed: 0, due: 0, rate: 0 };
+  }
+
+  let due = 0;
+  let completed = 0;
+  let cursor = effectiveStart;
+
+  const safety = 80_000;
+  let i = 0;
+  while (i < safety) {
+    if (cursor > effectiveEnd) break;
+    if (isDueOnDate(habit, cursor, logs)) {
+      due++;
+      if (isCompleteOnDate(habit, cursor, logs)) completed++;
+    }
+    cursor = addDays(cursor, 1);
+    i++;
+  }
+
+  return {
+    completed,
+    due,
+    rate: due === 0 ? 0 : completed / due,
+  };
+}
+
+export type DayStatus =
+  | "done"
+  | "missed"
+  | "not-due"
+  | "relapse"
+  | "before-creation";
+
+export interface HeatmapDay {
+  date: string;
+  status: DayStatus;
+}
+
+function daysInYear(year: number): number {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 366 : 365;
+}
+
+export function computeYearHeatmap(
+  habit: HabitInput,
+  logs: HabitLogInput[],
+  relapses: RelapseInput[],
+  year: number,
+  timezone: string,
+  now?: Date,
+): HeatmapDay[] {
+  const start = `${year}-01-01`;
+  const totalDays = daysInYear(year);
+  const today = formatDate(now ?? new Date(), timezone);
+  const createdAtDate = formatDate(new Date(habit.createdAt), timezone);
+
+  const relapseDates = new Set(
+    relapses
+      .filter((r) => r.habitId === habit.id)
+      .map((r) => formatDate(new Date(r.relapsedAt), timezone)),
+  );
+
+  const result: HeatmapDay[] = [];
+  let cursor = start;
+
+  for (let i = 0; i < totalDays; i++) {
+    let status: DayStatus;
+
+    if (cursor < createdAtDate) {
+      status = "before-creation";
+    } else if (cursor > today) {
+      status = "not-due";
+    } else if (habit.habitType === "negative") {
+      status = relapseDates.has(cursor) ? "relapse" : "done";
+    } else if (!isDueOnDate(habit, cursor, logs)) {
+      status = "not-due";
+    } else if (isCompleteOnDate(habit, cursor, logs)) {
+      status = "done";
+    } else {
+      status = "missed";
+    }
+
+    result.push({ date: cursor, status });
+    cursor = addDays(cursor, 1);
+  }
+
+  return result;
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { motion } from "motion/react";
 import { CheckIcon } from "./check-icon";
 
@@ -23,6 +24,7 @@ interface HabitCardProps {
 }
 
 export function HabitCard({
+  id,
   name,
   description,
   streak,
@@ -74,9 +76,9 @@ export function HabitCard({
     : 0;
 
   return (
-    <div className="border-hairline bg-surface-1 rounded-lg flex items-start gap-3 border p-4 transition-colors group">
+    <div className="border-hairline bg-surface-1 hover:border-hairline-strong rounded-lg relative flex items-start gap-3 border p-4 transition-colors group">
       {isNegative ? (
-        <div className="flex flex-col items-center gap-1.5 shrink-0">
+        <div className="relative z-10 flex shrink-0 flex-col items-center gap-1.5">
           <button
             type="button"
             onClick={(e) => {
@@ -92,7 +94,7 @@ export function HabitCard({
           />
         </div>
       ) : isQuantifiable ? (
-        <div className="flex flex-col items-center gap-1.5 shrink-0">
+        <div className="relative z-10 flex shrink-0 flex-col items-center gap-1.5">
           <button
             type="button"
             onClick={() => setAddingAmount(!addingAmount)}
@@ -110,7 +112,7 @@ export function HabitCard({
         <button
           type="button"
           onClick={() => onToggle(!done)}
-          className="mt-0 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border transition-colors"
+          className="relative z-10 mt-0 flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border transition-colors"
           style={{
             borderColor: done ? "#5e6ad2" : "#34343a",
             backgroundColor: done ? "#5e6ad2" : "transparent",
@@ -123,7 +125,7 @@ export function HabitCard({
 
       <div className="min-w-0 flex-1">
         {confirmingRelapse ? (
-          <div className="flex flex-col gap-2">
+          <div className="relative z-10 flex flex-col gap-2">
             <p className="text-[14px] leading-[1.5] text-[#f7f8f8]">
               Relapse on &ldquo;{name}&rdquo;? This resets your counter.
             </p>
@@ -149,7 +151,7 @@ export function HabitCard({
             </div>
           </div>
         ) : editing ? (
-          <div className="flex flex-col gap-2">
+          <div className="relative z-10 flex flex-col gap-2">
             <input
               type="text"
               value={editName}
@@ -193,13 +195,15 @@ export function HabitCard({
         ) : (
           <>
             <div className="flex items-center gap-2">
-              <span
-                className={`text-[16px] leading-[1.5] ${
+              <Link
+                href={`/habits/${id}`}
+                className={`before:absolute before:inset-0 before:z-0 before:content-[''] text-[16px] leading-[1.5] transition-colors hover:text-ink-muted ${
                   done ? "text-[#8a8f98] line-through" : "text-[#f7f8f8]"
                 }`}
+                aria-label={`View details for ${name}`}
               >
                 {name}
-              </span>
+              </Link>
               {isNegative && elapsed ? (
                 <span className="bg-surface-2 text-[#8a8f98] rounded-full px-2 py-0.5 text-[11px] leading-[1.4] font-medium">
                   {elapsed}
@@ -238,7 +242,7 @@ export function HabitCard({
                 </div>
 
                 {addingAmount && (
-                  <div className="flex items-center gap-1.5">
+                  <div className="relative z-10 flex items-center gap-1.5">
                     <input
                       type="number"
                       value={amountValue}
@@ -278,7 +282,7 @@ export function HabitCard({
               </div>
             )}
 
-            <div className="mt-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="relative z-10 mt-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 type="button"
                 onClick={() => {

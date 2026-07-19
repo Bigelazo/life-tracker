@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  computeBestStreak,
+  computeCompletionRate,
   computeDueToday,
   computeElapsedSince,
   computeProgress,
   computeStreak,
+  computeYearHeatmap,
   formatElapsed,
   isCompleteOnDate,
   isDueOnDate,
@@ -619,5 +622,410 @@ describe("negative habits", () => {
       const { coerceHabitType } = await import("./domain");
       expect(coerceHabitType("positive")).toBe("positive");
     });
+  });
+});
+
+describe("computeBestStreak", () => {
+  const HABIT_ID = "h";
+
+  function h(overrides?: Partial<HabitInput>): HabitInput {
+    return habit({
+      id: HABIT_ID,
+      name: "Test",
+      createdAt: "2026-01-01T00:00:00Z",
+      ...overrides,
+    });
+  }
+
+  it("returns 0 when there are no logs", () => {
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(computeBestStreak(h(), [], "UTC", now)).toBe(0);
+  });
+
+  it("returns 1 for a single log", () => {
+    const logs: HabitLogInput[] = [log(HABIT_ID, "2026-07-10")];
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(computeBestStreak(h(), logs, "UTC", now)).toBe(1);
+  });
+
+  it("returns 3 for a 3-day run", () => {
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-10"),
+      log(HABIT_ID, "2026-07-11"),
+      log(HABIT_ID, "2026-07-12"),
+    ];
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(computeBestStreak(h(), logs, "UTC", now)).toBe(3);
+  });
+
+  it("picks the longest run among multiple", () => {
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-01"),
+      log(HABIT_ID, "2026-07-02"),
+      log(HABIT_ID, "2026-07-04"),
+      log(HABIT_ID, "2026-07-05"),
+      log(HABIT_ID, "2026-07-06"),
+      log(HABIT_ID, "2026-07-07"),
+    ];
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(computeBestStreak(h(), logs, "UTC", now)).toBe(4);
+  });
+
+  it("does not break on non-due days (fixed weekdays)", () => {
+    const gym = h({
+      frequency: { type: "fixed_weekdays", days: [1, 3, 5] },
+    });
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-13"),
+      log(HABIT_ID, "2026-07-15"),
+      log(HABIT_ID, "2026-07-17"),
+    ];
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(computeBestStreak(gym, logs, "UTC", now)).toBe(3);
+  });
+
+  it("counts non-due days as transparent for fixed weekdays across longer spans", () => {
+    const gym = h({
+      frequency: { type: "fixed_weekdays", days: [1, 5] },
+    });
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-06-01"),
+      log(HABIT_ID, "2026-06-05"),
+      log(HABIT_ID, "2026-06-08"),
+      log(HABIT_ID, "2026-06-12"),
+    ];
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(computeBestStreak(gym, logs, "UTC", now)).toBe(4);
+  });
+
+  it("returns 0 for negative habits", () => {
+    const neg = habit({
+      id: HABIT_ID,
+      name: "Neg",
+      habitType: "negative",
+    });
+    const logs: HabitLogInput[] = [log(HABIT_ID, "2026-07-10")];
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(computeBestStreak(neg, logs, "UTC", now)).toBe(0);
+  });
+
+  it("honors quantifiable completion threshold", () => {
+    const water = h({ target: 2, unit: "L" });
+    const logs: HabitLogInput[] = [
+      { habitId: HABIT_ID, logDate: "2026-07-10", amount: 2 },
+      { habitId: HABIT_ID, logDate: "2026-07-11", amount: 1 },
+      { habitId: HABIT_ID, logDate: "2026-07-12", amount: 2 },
+      { habitId: HABIT_ID, logDate: "2026-07-13", amount: 2 },
+    ];
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(computeBestStreak(water, logs, "UTC", now)).toBe(2);
+  });
+
+  it("ignores logs from other habits", () => {
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-10"),
+      log(HABIT_ID, "2026-07-11"),
+      log(HABIT_ID, "2026-07-12"),
+      log("other-habit", "2026-07-10"),
+      log("other-habit", "2026-07-11"),
+    ];
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(computeBestStreak(h(), logs, "UTC", now)).toBe(3);
+  });
+});
+
+describe("computeCompletionRate", () => {
+  const HABIT_ID = "h";
+
+  function h(overrides?: Partial<HabitInput>): HabitInput {
+    return habit({
+      id: HABIT_ID,
+      name: "Test",
+      createdAt: "2026-01-01T00:00:00Z",
+      ...overrides,
+    });
+  }
+
+  it("returns zeros when range ends before habit was created", () => {
+    const later = h({ createdAt: "2026-12-01T00:00:00Z" });
+    const now = new Date("2026-07-18T12:00:00Z");
+    const result = computeCompletionRate(
+      later,
+      [],
+      "2026-07-01",
+      "2026-07-18",
+      "UTC",
+      now,
+    );
+    expect(result).toEqual({ completed: 0, due: 0, rate: 0 });
+  });
+
+  it("100% when every due day is complete (daily)", () => {
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-10"),
+      log(HABIT_ID, "2026-07-11"),
+      log(HABIT_ID, "2026-07-12"),
+    ];
+    const now = new Date("2026-07-12T12:00:00Z");
+    const result = computeCompletionRate(
+      h(),
+      logs,
+      "2026-07-10",
+      "2026-07-12",
+      "UTC",
+      now,
+    );
+    expect(result.completed).toBe(3);
+    expect(result.due).toBe(3);
+    expect(result.rate).toBe(1);
+  });
+
+  it("50% when half of due days are complete (daily)", () => {
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-10"),
+      log(HABIT_ID, "2026-07-12"),
+    ];
+    const now = new Date("2026-07-13T12:00:00Z");
+    const result = computeCompletionRate(
+      h(),
+      logs,
+      "2026-07-10",
+      "2026-07-13",
+      "UTC",
+      now,
+    );
+    expect(result.completed).toBe(2);
+    expect(result.due).toBe(4);
+    expect(result.rate).toBe(0.5);
+  });
+
+  it("ignores non-due days (fixed weekdays)", () => {
+    const gym = h({
+      frequency: { type: "fixed_weekdays", days: [1, 3, 5] },
+    });
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-13"),
+    ];
+    const now = new Date("2026-07-18T12:00:00Z");
+    const result = computeCompletionRate(
+      gym,
+      logs,
+      "2026-07-13",
+      "2026-07-17",
+      "UTC",
+      now,
+    );
+    expect(result.completed).toBe(1);
+    expect(result.due).toBe(3);
+    expect(result.rate).toBeCloseTo(1 / 3, 5);
+  });
+
+  it("ignores days before creation", () => {
+    const later = h({ createdAt: "2026-07-15T00:00:00Z" });
+    const logs: HabitLogInput[] = [log(HABIT_ID, "2026-07-15")];
+    const now = new Date("2026-07-18T12:00:00Z");
+    const result = computeCompletionRate(
+      later,
+      logs,
+      "2026-07-10",
+      "2026-07-18",
+      "UTC",
+      now,
+    );
+    expect(result.completed).toBe(1);
+    expect(result.due).toBe(4);
+    expect(result.rate).toBe(0.25);
+  });
+
+  it("ignores future days", () => {
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-10"),
+      log(HABIT_ID, "2026-07-11"),
+    ];
+    const now = new Date("2026-07-11T12:00:00Z");
+    const result = computeCompletionRate(
+      h(),
+      logs,
+      "2026-07-10",
+      "2026-07-20",
+      "UTC",
+      now,
+    );
+    expect(result.completed).toBe(2);
+    expect(result.due).toBe(2);
+    expect(result.rate).toBe(1);
+  });
+
+  it("quantifiable: counts a day only when amount >= target", () => {
+    const water = h({ target: 2, unit: "L" });
+    const logs: HabitLogInput[] = [
+      { habitId: HABIT_ID, logDate: "2026-07-10", amount: 1 },
+      { habitId: HABIT_ID, logDate: "2026-07-11", amount: 2 },
+      { habitId: HABIT_ID, logDate: "2026-07-12", amount: 3 },
+    ];
+    const now = new Date("2026-07-12T12:00:00Z");
+    const result = computeCompletionRate(
+      water,
+      logs,
+      "2026-07-10",
+      "2026-07-12",
+      "UTC",
+      now,
+    );
+    expect(result.completed).toBe(2);
+    expect(result.due).toBe(3);
+    expect(result.rate).toBeCloseTo(2 / 3, 5);
+  });
+
+  it("ignores logs from other habits", () => {
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-10"),
+      log("other-habit", "2026-07-11"),
+      log("other-habit", "2026-07-12"),
+    ];
+    const now = new Date("2026-07-12T12:00:00Z");
+    const result = computeCompletionRate(
+      h(),
+      logs,
+      "2026-07-10",
+      "2026-07-12",
+      "UTC",
+      now,
+    );
+    expect(result.completed).toBe(1);
+    expect(result.due).toBe(3);
+    expect(result.rate).toBeCloseTo(1 / 3, 5);
+  });
+
+  it("returns 0 rate for negative habits (semantics don't apply)", () => {
+    const neg = habit({
+      id: HABIT_ID,
+      name: "Neg",
+      habitType: "negative",
+    });
+    const now = new Date("2026-07-12T12:00:00Z");
+    const result = computeCompletionRate(
+      neg,
+      [],
+      "2026-07-10",
+      "2026-07-12",
+      "UTC",
+      now,
+    );
+    expect(result).toEqual({ completed: 0, due: 0, rate: 0 });
+  });
+});
+
+describe("computeYearHeatmap", () => {
+  const HABIT_ID = "h";
+
+  function h(overrides?: Partial<HabitInput>): HabitInput {
+    return habit({
+      id: HABIT_ID,
+      name: "Test",
+      createdAt: "2026-01-01T00:00:00Z",
+      ...overrides,
+    });
+  }
+
+  it("returns one entry per day in the year", () => {
+    const now = new Date("2026-07-18T12:00:00Z");
+    const days = computeYearHeatmap(h(), [], [], 2026, "UTC", now);
+    expect(days).toHaveLength(365);
+    expect(days[0]?.date).toBe("2026-01-01");
+    expect(days[364]?.date).toBe("2026-12-31");
+  });
+
+  it("daily: marks complete days as done, others as missed, before-creation dates", () => {
+    const older = h({ createdAt: "2026-06-01T00:00:00Z" });
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-06-01"),
+      log(HABIT_ID, "2026-06-03"),
+    ];
+    const now = new Date("2026-06-05T12:00:00Z");
+    const days = computeYearHeatmap(older, logs, [], 2026, "UTC", now);
+    const map = new Map(days.map((d) => [d.date, d.status]));
+    expect(map.get("2026-01-15")).toBe("before-creation");
+    expect(map.get("2026-06-01")).toBe("done");
+    expect(map.get("2026-06-02")).toBe("missed");
+    expect(map.get("2026-06-03")).toBe("done");
+    expect(map.get("2026-06-04")).toBe("missed");
+  });
+
+  it("fixed weekdays: marks off-days as not-due", () => {
+    const gym = h({
+      frequency: { type: "fixed_weekdays", days: [1, 3, 5] },
+    });
+    const logs: HabitLogInput[] = [log(HABIT_ID, "2026-07-13")];
+    const now = new Date("2026-07-18T12:00:00Z");
+    const days = computeYearHeatmap(gym, logs, [], 2026, "UTC", now);
+    const map = new Map(days.map((d) => [d.date, d.status]));
+    expect(map.get("2026-07-13")).toBe("done");
+    expect(map.get("2026-07-14")).toBe("not-due");
+    expect(map.get("2026-07-15")).toBe("missed");
+    expect(map.get("2026-07-16")).toBe("not-due");
+    expect(map.get("2026-07-17")).toBe("missed");
+  });
+
+  it("quantifiable: target hit = done; below target = missed", () => {
+    const water = h({
+      target: 2,
+      unit: "L",
+      createdAt: "2026-06-01T00:00:00Z",
+    });
+    const logs: HabitLogInput[] = [
+      { habitId: HABIT_ID, logDate: "2026-07-13", amount: 2 },
+      { habitId: HABIT_ID, logDate: "2026-07-14", amount: 1 },
+    ];
+    const now = new Date("2026-07-15T12:00:00Z");
+    const days = computeYearHeatmap(water, logs, [], 2026, "UTC", now);
+    const map = new Map(days.map((d) => [d.date, d.status]));
+    expect(map.get("2026-07-13")).toBe("done");
+    expect(map.get("2026-07-14")).toBe("missed");
+  });
+
+  it("negative habit: relapse day = relapse, others = done, before creation = before-creation", () => {
+    const neg = habit({
+      id: HABIT_ID,
+      name: "Caffeine",
+      habitType: "negative",
+      createdAt: "2026-05-01T00:00:00Z",
+    });
+    const relapses: RelapseInput[] = [
+      { id: "r1", habitId: HABIT_ID, relapsedAt: "2026-07-15T08:00:00Z" },
+    ];
+    const now = new Date("2026-07-18T12:00:00Z");
+    const days = computeYearHeatmap(neg, [], relapses, 2026, "UTC", now);
+    const map = new Map(days.map((d) => [d.date, d.status]));
+    expect(map.get("2026-04-15")).toBe("before-creation");
+    expect(map.get("2026-05-01")).toBe("done");
+    expect(map.get("2026-07-15")).toBe("relapse");
+    expect(map.get("2026-07-16")).toBe("done");
+  });
+
+  it("handles a 366-day leap year", () => {
+    const now = new Date("2024-06-15T12:00:00Z");
+    const days = computeYearHeatmap(h(), [], [], 2024, "UTC", now);
+    expect(days).toHaveLength(366);
+    expect(days[365]?.date).toBe("2024-12-31");
+  });
+
+  it("future days (past today) for daily are not-due", () => {
+    const now = new Date("2026-07-18T12:00:00Z");
+    const days = computeYearHeatmap(h(), [], [], 2026, "UTC", now);
+    const map = new Map(days.map((d) => [d.date, d.status]));
+    expect(map.get("2026-07-17")).toBe("missed");
+    expect(map.get("2026-07-18")).toBe("missed");
+    expect(map.get("2026-07-19")).toBe("not-due");
+    expect(map.get("2026-12-31")).toBe("not-due");
+  });
+
+  it("timezone boundary: log just before midnight is in the previous day", () => {
+    const logs: HabitLogInput[] = [log(HABIT_ID, "2026-07-17")];
+    const justAfterMidnight = new Date("2026-07-18T00:01:00-04:00");
+    const days = computeYearHeatmap(h(), logs, [], 2026, TZ_NY, justAfterMidnight);
+    const map = new Map(days.map((d) => [d.date, d.status]));
+    expect(map.get("2026-07-17")).toBe("done");
+    expect(map.get("2026-07-18")).toBe("missed");
   });
 });
