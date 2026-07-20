@@ -8,6 +8,7 @@ import {
   computeProgress,
   computeStreak,
   formatElapsed,
+  isoDateNDaysAgo,
   todayDateString,
 } from "@/habits/domain";
 import type { HabitInput, LogIndex, RelapseInput } from "@/habits/domain";
@@ -36,15 +37,6 @@ import { HabitForm } from "@/components/habit-form";
  * counter, not "time since creation".
  */
 const LIST_LOOKBACK_DAYS = 90;
-
-function isoDateNDaysAgo(days: number, now: Date = new Date()): string {
-  const d = new Date(now);
-  d.setDate(d.getDate() - days);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 export function HabitsContent() {
   const sinceDate = useMemo(() => isoDateNDaysAgo(LIST_LOOKBACK_DAYS), []);

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("the Today dashboard renders three widget cards for Habits, Finance, and Notes", async ({
+test("the Today dashboard renders widget cards for Finance and Notes, plus the habits widget", async ({
   page,
 }) => {
   await page.goto("/today");
@@ -9,18 +9,18 @@ test("the Today dashboard renders three widget cards for Habits, Finance, and No
     page.getByRole("heading", { name: "Today", level: 1 }),
   ).toBeVisible();
 
-  const section = page.locator("section");
-  const links = section.locator("a");
+  // Two navigation cards (Finance + Notes); Habits gets its own widget now.
+  const financeCard = page.getByRole("link", { name: "Finance", exact: true });
+  const notesCard = page.getByRole("link", { name: "Notes", exact: true });
+  await expect(financeCard).toHaveAttribute("href", "/finance");
+  await expect(notesCard).toHaveAttribute("href", "/notes");
 
-  await expect(links).toHaveCount(3);
-
-  await expect(links.nth(0)).toHaveAttribute("href", "/habits");
-  await expect(links.nth(1)).toHaveAttribute("href", "/finance");
-  await expect(links.nth(2)).toHaveAttribute("href", "/notes");
-
-  await expect(links.nth(0)).toContainText("Habits");
-  await expect(links.nth(1)).toContainText("Finance");
-  await expect(links.nth(2)).toContainText("Notes");
+  // The habits widget is the prominent panel on the dashboard.
+  await expect(
+    page.getByTestId("today-habits-widget").or(
+      page.getByText("Nothing due today"),
+    ),
+  ).toBeVisible();
 });
 
 test("clicking a widget card navigates to the section page", async ({
@@ -28,15 +28,11 @@ test("clicking a widget card navigates to the section page", async ({
 }) => {
   await page.goto("/today");
 
-  await page.getByRole("link", { name: "Habits" }).first().click();
-  await expect(page).toHaveURL(/\/habits$/);
-
-  await page.goto("/today");
-  await page.getByRole("link", { name: "Finance" }).first().click();
+  await page.getByRole("link", { name: "Finance", exact: true }).first().click();
   await expect(page).toHaveURL(/\/finance$/);
 
   await page.goto("/today");
-  await page.getByRole("link", { name: "Notes" }).first().click();
+  await page.getByRole("link", { name: "Notes", exact: true }).first().click();
   await expect(page).toHaveURL(/\/notes$/);
 });
 
@@ -53,7 +49,7 @@ test("⌘K opens the command palette with navigation commands to all four sectio
   await expect(dialog).toBeVisible();
 
   for (const label of ["Today", "Habits", "Finance", "Notes"]) {
-    await expect(dialog.getByText(label)).toBeVisible();
+    await expect(dialog.getByText(label, { exact: true })).toBeVisible();
   }
 });
 
@@ -80,10 +76,18 @@ test("the dashboard layout is responsive", async ({ page }) => {
   await page.goto("/today");
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  const sectionDesktop = page.locator("section");
-  await expect(sectionDesktop.locator("a")).toHaveCount(3);
+  await expect(
+    page.getByRole("link", { name: "Finance", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Notes", exact: true }),
+  ).toBeVisible();
 
   await page.setViewportSize({ width: 375, height: 812 });
-  const sectionMobile = page.locator("section");
-  await expect(sectionMobile.locator("a")).toHaveCount(3);
+  await expect(
+    page.getByRole("link", { name: "Finance", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Notes", exact: true }),
+  ).toBeVisible();
 });

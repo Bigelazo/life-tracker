@@ -11,6 +11,7 @@ import {
   formatElapsed,
   isCompleteOnDate,
   isDueOnDate,
+  isoDateNDaysAgo,
   todayDateString,
 } from "./domain";
 import type { HabitInput, HabitLogInput, RelapseInput } from "./domain";
@@ -52,6 +53,26 @@ describe("todayDateString", () => {
     expect(todayDateString("UTC", justAfterMidnight)).toBe("2026-07-18");
     const justBeforeMidnight = new Date("2026-07-17T23:59:00Z");
     expect(todayDateString("UTC", justBeforeMidnight)).toBe("2026-07-17");
+  });
+});
+
+describe("isoDateNDaysAgo", () => {
+  it("returns the ISO date N days before the given now", () => {
+    const now = new Date("2026-07-18T12:00:00Z");
+    expect(isoDateNDaysAgo(0, now)).toBe("2026-07-18");
+    expect(isoDateNDaysAgo(1, now)).toBe("2026-07-17");
+    expect(isoDateNDaysAgo(7, now)).toBe("2026-07-11");
+  });
+
+  it("crosses month and year boundaries", () => {
+    const now = new Date("2026-01-03T12:00:00Z");
+    expect(isoDateNDaysAgo(5, now)).toBe("2025-12-29");
+  });
+
+  it("pads single-digit months and days", () => {
+    const now = new Date("2026-03-05T12:00:00Z");
+    expect(isoDateNDaysAgo(1, now)).toBe("2026-03-04");
+    expect(isoDateNDaysAgo(31, now)).toBe("2026-02-02");
   });
 });
 
