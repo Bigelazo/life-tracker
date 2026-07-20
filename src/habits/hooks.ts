@@ -19,6 +19,22 @@ async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+function buildLogsKey(habitId: string | null | undefined, since: string | null | undefined) {
+  return ["habit-logs", { habitId: habitId ?? null, since: since ?? null }] as const;
+}
+
+function buildQuery(
+  base: string,
+  params: Record<string, string | null | undefined>,
+): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v != null && v !== "") sp.set(k, v);
+  }
+  const qs = sp.toString();
+  return qs ? `${base}?${qs}` : base;
+}
+
 export function useHabits() {
   return useQuery({
     queryKey: ["habits"],
@@ -26,10 +42,48 @@ export function useHabits() {
   });
 }
 
-export function useHabitLogs() {
+interface UseHabitLogsOptions {
+  /** Restrict to logs for a single habit (e.g. the detail view). */
+  habitId?: string | null;
+  /** ISO date string (YYYY-MM-DD) lower-bound on logDate. */
+  since?: string | null;
+}
+
+export function useHabitLogs(options: UseHabitLogsOptions = {}) {
+  const { habitId, since } = options;
+  const queryKey = buildLogsKey(habitId, since);
   return useQuery({
-    queryKey: ["habit-logs"],
-    queryFn: () => fetchJSON<HabitLogResponse[]>("/api/habits/logs"),
+    queryKey,
+    queryFn: () =>
+      fetchJSON<HabitLogResponse[]>(
+        buildQuery("/api/habits/logs", { habitId: habitId ?? undefined, since: since ?? undefined }),
+      ),
+  });
+}
+
+export function useAllRelapses(options: { since?: string | null } = {}) {
+  const { since } = options;
+  return useQuery({
+    queryKey: ["all-habit-relapses", { since: since ?? null }],
+    queryFn: () =>
+      fetchJSON<RelapseResponse[]>(
+        buildQuery("/api/habits/relapses", { since: since ?? undefined }),
+      ),
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+}
+
+export function useHabitRelapses(habitId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["habit-relapses", { habitId: habitId ?? null }],
+    queryFn: () =>
+      fetchJSON<RelapseResponse[]>(
+        buildQuery("/api/habits/relapses", { habitId: habitId ?? undefined }),
+      ),
+    enabled: Boolean(habitId),
+    staleTime: 5 * 60_000,
+    retry: false,
   });
 }
 
@@ -124,7 +178,9 @@ export function useCheckHabit() {
       }),
     onMutate: async ({ habitId, logDate, amount }) => {
       await qc.cancelQueries({ queryKey: ["habit-logs"] });
-      const previous = qc.getQueryData<HabitLogResponse[]>(["habit-logs"]);
+      const snapshots = qc.getQueriesData<HabitLogResponse[]>({
+        queryKey: ["habit-logs"],
+      });
       const optimistic: HabitLogResponse = {
         id: `optimistic-${habitId}-${logDate}-${Date.now()}`,
         habitId,
@@ -132,14 +188,16 @@ export function useCheckHabit() {
         amount: amount ?? 1,
         createdAt: new Date().toISOString(),
       };
-      qc.setQueryData<HabitLogResponse[]>(["habit-logs"], (old) =>
-        old ? [...old, optimistic] : [optimistic],
-      );
-      return { previous };
+      for (const [key] of snapshots) {
+        qc.setQueryData<HabitLogResponse[]>(key, (prev) =>
+          prev ? [...prev, optimistic] : [optimistic],
+        );
+      }
+      return { snapshots };
     },
     onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        qc.setQueryData(["habit-logs"], context.previous);
+      for (const [key, value] of context?.snapshots ?? []) {
+        if (value !== undefined) qc.setQueryData(key, value);
       }
     },
     onSettled: () => {
@@ -164,29 +222,24 @@ export function useUncheckHabit() {
       ),
     onMutate: async ({ habitId, logDate }) => {
       await qc.cancelQueries({ queryKey: ["habit-logs"] });
-      const previous = qc.getQueryData<HabitLogResponse[]>(["habit-logs"]);
-      qc.setQueryData<HabitLogResponse[]>(["habit-logs"], (old) =>
-        old?.filter((l) => !(l.habitId === habitId && l.logDate === logDate)) ?? [],
-      );
-      return { previous };
+      const snapshots = qc.getQueriesData<HabitLogResponse[]>({
+        queryKey: ["habit-logs"],
+      });
+      for (const [key] of snapshots) {
+        qc.setQueryData<HabitLogResponse[]>(key, (prev) =>
+          prev?.filter((l) => !(l.habitId === habitId && l.logDate === logDate)) ?? [],
+        );
+      }
+      return { snapshots };
     },
     onError: (_err, _vars, context) => {
-      if (context?.previous) {
-        qc.setQueryData(["habit-logs"], context.previous);
+      for (const [key, value] of context?.snapshots ?? []) {
+        if (value !== undefined) qc.setQueryData(key, value);
       }
     },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: ["habit-logs"] });
     },
-  });
-}
-
-export function useAllRelapses() {
-  return useQuery({
-    queryKey: ["all-habit-relapses"],
-    queryFn: () => fetchJSON<RelapseResponse[]>("/api/habits/relapses"),
-    staleTime: 5 * 60_000,
-    retry: false,
   });
 }
 
@@ -206,33 +259,41 @@ export function useRecordRelapse() {
         body: JSON.stringify({ relapsedAt }),
       }),
     onMutate: async ({ habitId }) => {
-      await qc.cancelQueries({ queryKey: ["habit-relapses", habitId] });
+      await qc.cancelQueries({ queryKey: ["habit-relapses"] });
       await qc.cancelQueries({ queryKey: ["all-habit-relapses"] });
-      const previous = qc.getQueryData<RelapseResponse[]>(["habit-relapses", habitId]);
-      const allPrevious = qc.getQueryData<RelapseResponse[]>(["all-habit-relapses"]);
+      const singleSnapshots = qc.getQueriesData<RelapseResponse[]>({
+        queryKey: ["habit-relapses"],
+      });
+      const allSnapshots = qc.getQueriesData<RelapseResponse[]>({
+        queryKey: ["all-habit-relapses"],
+      });
       const optimistic: RelapseResponse = {
         id: `optimistic-${habitId}-${Date.now()}`,
         habitId,
         relapsedAt: new Date().toISOString(),
       };
-      qc.setQueryData<RelapseResponse[]>(["habit-relapses", habitId], (old) =>
-        old ? [optimistic, ...old] : [optimistic],
-      );
-      qc.setQueryData<RelapseResponse[]>(["all-habit-relapses"], (old) =>
-        old ? [optimistic, ...old] : [optimistic],
-      );
-      return { previous, allPrevious };
-    },
-    onError: (_err, { habitId }, context) => {
-      if (context?.previous) {
-        qc.setQueryData(["habit-relapses", habitId], context.previous);
+      for (const [key] of singleSnapshots) {
+        qc.setQueryData<RelapseResponse[]>(key, (prev) =>
+          prev ? [optimistic, ...prev] : [optimistic],
+        );
       }
-      if (context?.allPrevious) {
-        qc.setQueryData(["all-habit-relapses"], context.allPrevious);
+      for (const [key] of allSnapshots) {
+        qc.setQueryData<RelapseResponse[]>(key, (prev) =>
+          prev ? [optimistic, ...prev] : [optimistic],
+        );
+      }
+      return { singleSnapshots, allSnapshots };
+    },
+    onError: (_err, _vars, context) => {
+      for (const [key, value] of context?.singleSnapshots ?? []) {
+        if (value !== undefined) qc.setQueryData(key, value);
+      }
+      for (const [key, value] of context?.allSnapshots ?? []) {
+        if (value !== undefined) qc.setQueryData(key, value);
       }
     },
-    onSettled: (_data, _err, { habitId }) => {
-      qc.invalidateQueries({ queryKey: ["habit-relapses", habitId] });
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["habit-relapses"] });
       qc.invalidateQueries({ queryKey: ["all-habit-relapses"] });
     },
   });

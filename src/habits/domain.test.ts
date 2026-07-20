@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildLogIndex,
   computeBestStreak,
   computeCompletionRate,
   computeDueToday,
@@ -1027,5 +1028,65 @@ describe("computeYearHeatmap", () => {
     const map = new Map(days.map((d) => [d.date, d.status]));
     expect(map.get("2026-07-17")).toBe("done");
     expect(map.get("2026-07-18")).toBe("missed");
+  });
+
+  it("accepts a prebuilt index and matches the array-based result", () => {
+    const logs: HabitLogInput[] = [
+      log(HABIT_ID, "2026-07-13"),
+      log(HABIT_ID, "2026-07-15"),
+      log(HABIT_ID, "2026-07-17"),
+    ];
+    const gym = h({ frequency: { type: "fixed_weekdays", days: [1, 3, 5] } });
+    const now = new Date("2026-07-18T12:00:00Z");
+    const fromArray = computeYearHeatmap(gym, logs, [], 2026, "UTC", now);
+    const fromIndex = computeYearHeatmap(gym, buildLogIndex(logs), [], 2026, "UTC", now);
+    expect(fromIndex).toEqual(fromArray);
+  });
+});
+
+describe("buildLogIndex", () => {
+  it("produces identical results to passing the raw array, for every consumer", () => {
+    const gym = habit({
+      id: "gym",
+      name: "Gym",
+      frequency: { type: "fixed_weekdays", days: [1, 3, 5] },
+    });
+    const water = habit({
+      id: "water",
+      name: "Water",
+      target: 2,
+      unit: "L",
+    });
+    const logs: HabitLogInput[] = [
+      log("gym", "2026-07-13"),
+      log("gym", "2026-07-15"),
+      log("gym", "2026-07-17"),
+      { habitId: "water", logDate: "2026-07-17", amount: 1 },
+      { habitId: "water", logDate: "2026-07-17", amount: 0.5 },
+      { habitId: "water", logDate: "2026-07-18", amount: 0.6 },
+    ];
+    const now = new Date("2026-07-18T12:00:00Z");
+    const index = buildLogIndex(logs);
+
+    expect(computeStreak(gym, index, "UTC", now)).toBe(
+      computeStreak(gym, logs, "UTC", now),
+    );
+    expect(computeBestStreak(gym, index, "UTC", now)).toBe(
+      computeBestStreak(gym, logs, "UTC", now),
+    );
+    expect(
+      computeCompletionRate(gym, index, "2026-01-01", "2026-12-31", "UTC", now),
+    ).toEqual(
+      computeCompletionRate(gym, logs, "2026-01-01", "2026-12-31", "UTC", now),
+    );
+    expect(isCompleteOnDate(water, "2026-07-17", index)).toBe(
+      isCompleteOnDate(water, "2026-07-17", logs),
+    );
+    expect(isCompleteOnDate(water, "2026-07-18", index)).toBe(
+      isCompleteOnDate(water, "2026-07-18", logs),
+    );
+    expect(computeProgress(water, "2026-07-17", index)).toEqual(
+      computeProgress(water, "2026-07-17", logs),
+    );
   });
 });

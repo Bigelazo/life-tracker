@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
 import {
+  buildLogIndex,
   computeBestStreak,
   computeCompletionRate,
   computeElapsedSince,
@@ -12,10 +13,10 @@ import {
   formatElapsed,
   todayDateString,
 } from "@/habits/domain";
-import type { RelapseInput } from "@/habits/domain";
+import type { LogIndex, RelapseInput } from "@/habits/domain";
 import {
-  useAllRelapses,
   useHabitLogs,
+  useHabitRelapses,
   useHabits,
   useSettings,
 } from "@/habits/hooks";
@@ -57,8 +58,8 @@ function getAvailableYears(createdAt: string, nowYear: number): number[] {
 
 export function HabitDetail({ habitId }: { habitId: string }) {
   const { data: habits, isLoading: habitsLoading, isError: habitsError } = useHabits();
-  const { data: logs, isLoading: logsLoading } = useHabitLogs();
-  const { data: relapseRecords } = useAllRelapses();
+  const { data: logs, isLoading: logsLoading } = useHabitLogs({ habitId });
+  const { data: relapseRecords } = useHabitRelapses(habitId);
   const { data: settings } = useSettings();
 
   const timezone = settings?.timezone ?? "UTC";
@@ -107,47 +108,42 @@ export function HabitDetail({ habitId }: { habitId: string }) {
     [relapseRecords],
   );
 
-  const habitRelapses = useMemo(
-    () => domainRelapses.filter((r) => r.habitId === habitId),
-    [domainRelapses, habitId],
-  );
+  const relapseCount = domainRelapses.length;
+
+  const logIndex: LogIndex = useMemo(() => buildLogIndex(domainLogs), [domainLogs]);
 
   const streak = useMemo(
-    () => (habit ? computeStreak(habit, domainLogs, timezone) : 0),
-    // tick invalidates once a minute so "now" stays fresh
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [habit, domainLogs, timezone, tick],
+    () => (habit ? computeStreak(habit, logIndex, timezone) : 0),
+    [habit, logIndex, timezone],
   );
 
   const bestStreak = useMemo(
-    () => (habit ? computeBestStreak(habit, domainLogs, timezone) : 0),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [habit, domainLogs, timezone, tick],
+    () => (habit ? computeBestStreak(habit, logIndex, timezone) : 0),
+    [habit, logIndex, timezone],
   );
 
   const completion = useMemo(() => {
     if (!habit) return { completed: 0, due: 0, rate: 0 };
     const yearStart = `${safeSelectedYear}-01-01`;
     const yearEnd = `${safeSelectedYear}-12-31`;
-    return computeCompletionRate(habit, domainLogs, yearStart, yearEnd, timezone);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [habit, domainLogs, timezone, safeSelectedYear, tick]);
+    return computeCompletionRate(habit, logIndex, yearStart, yearEnd, timezone);
+  }, [habit, logIndex, timezone, safeSelectedYear]);
 
   const heatmapDays = useMemo(() => {
     if (!habit) return [];
     return computeYearHeatmap(
       habit,
-      domainLogs,
+      logIndex,
       domainRelapses,
       safeSelectedYear,
       timezone,
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [habit, domainLogs, domainRelapses, safeSelectedYear, timezone, tick]);
+  }, [habit, logIndex, domainRelapses, safeSelectedYear, timezone]);
 
   const elapsed = useMemo(() => {
     if (!habit || habit.habitType !== "negative") return null;
-    return computeElapsedSince(habit, domainRelapses);
+    return computeElapsedSince(habit, domainRelapses, new Date());
+    // tick invalidates the memo once a minute so the counter stays fresh
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [habit, domainRelapses, tick]);
 
@@ -228,9 +224,9 @@ export function HabitDetail({ habitId }: { habitId: string }) {
             />
             <StatCard
               label="Relapses"
-              value={String(habitRelapses.length)}
+              value={String(relapseCount)}
               hint={
-                habitRelapses.length === 0
+                relapseCount === 0
                   ? "No relapses recorded"
                   : "All time"
               }

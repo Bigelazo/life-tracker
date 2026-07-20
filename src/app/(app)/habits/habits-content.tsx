@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  buildLogIndex,
   computeDueToday,
   computeElapsedSince,
   computeProgress,
@@ -9,7 +10,7 @@ import {
   formatElapsed,
   todayDateString,
 } from "@/habits/domain";
-import type { HabitInput, RelapseInput } from "@/habits/domain";
+import type { HabitInput, LogIndex, RelapseInput } from "@/habits/domain";
 import {
   useAllRelapses,
   useArchiveHabit,
@@ -25,9 +26,31 @@ import {
 import { HabitCard } from "@/components/habit-card";
 import { HabitForm } from "@/components/habit-form";
 
+/**
+ * How far back the list view needs log history. The streak badge on each
+ * card is bounded to this window, which is the single biggest reason the
+ * `/api/habits/logs` payload stays small regardless of how long the user
+ * has tracked. The detail view requests a per-habit slice without this
+ * bound. Relapses are NOT bounded — `computeElapsedSince` needs every
+ * row so a habit that hasn't relapsed in 6 months still shows the right
+ * counter, not "time since creation".
+ */
+const LIST_LOOKBACK_DAYS = 90;
+
+function isoDateNDaysAgo(days: number, now: Date = new Date()): string {
+  const d = new Date(now);
+  d.setDate(d.getDate() - days);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function HabitsContent() {
+  const sinceDate = useMemo(() => isoDateNDaysAgo(LIST_LOOKBACK_DAYS), []);
+
   const { data: habits, isLoading: habitsLoading, isError: habitsError, error: habitsErr } = useHabits();
-  const { data: logs, isLoading: logsLoading, isError: logsError } = useHabitLogs();
+  const { data: logs, isLoading: logsLoading, isError: logsError } = useHabitLogs({ since: sinceDate });
   const { data: relapseRecords } = useAllRelapses();
   const { data: settings } = useSettings();
   const createHabit = useCreateHabit();
@@ -37,9 +60,11 @@ export function HabitsContent() {
   const uncheckHabit = useUncheckHabit();
   const recordRelapse = useRecordRelapse();
 
-  const [tick, setTick] = useState(0);
   const timezone = settings?.timezone ?? "UTC";
 
+  // Tick invalidates the elapsed-time memo once a minute so the negative
+  // habit counters on the list stay fresh without a full re-render.
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     const interval = setInterval(() => setTick((t) => t + 1), 60_000);
     return () => clearInterval(interval);
@@ -81,32 +106,32 @@ export function HabitsContent() {
     [relapseRecords],
   );
 
+  // Build the index once per logs reference; every per-habit computation
+  // below reuses it instead of re-filtering the full array.
+  const logIndex: LogIndex = useMemo(() => buildLogIndex(domainLogs), [domainLogs]);
+
   const dueToday = useMemo(() => {
     if (!habits) return [];
-    return computeDueToday(domainHabits, domainLogs, timezone);
-  }, [habits, domainHabits, domainLogs, timezone]);
+    return computeDueToday(domainHabits, logIndex, timezone);
+  }, [habits, domainHabits, logIndex, timezone]);
 
   const streaks = useMemo(() => {
     if (!habits || !logs) return new Map<string, number>();
-    const habitIds = new Set(logs.map((l) => l.habitId));
     const map = new Map<string, number>();
-    for (const habitId of habitIds) {
-      const habit = domainHabits.find((h) => h.id === habitId);
-      if (habit) {
-        map.set(habitId, computeStreak(habit, domainLogs, timezone));
-      }
+    for (const habit of domainHabits) {
+      map.set(habit.id, computeStreak(habit, logIndex, timezone));
     }
     return map;
-  }, [habits, logs, domainHabits, domainLogs, timezone]);
+  }, [habits, logs, domainHabits, logIndex, timezone]);
 
   const progressMap = useMemo(() => {
     const today = todayDateString(timezone);
     const map = new Map<string, { current: number; target: number | null; unit: string | null }>();
     for (const habit of domainHabits) {
-      map.set(habit.id, computeProgress(habit, today, domainLogs));
+      map.set(habit.id, computeProgress(habit, today, logIndex));
     }
     return map;
-  }, [domainHabits, domainLogs, timezone]);
+  }, [domainHabits, logIndex, timezone]);
 
   const elapsedMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -118,6 +143,7 @@ export function HabitsContent() {
       }
     }
     return map;
+    // tick invalidates once a minute so the counter stays fresh
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domainHabits, domainRelapses, tick]);
 
