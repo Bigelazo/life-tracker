@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { habitRelapses } from "@/db/schema";
+import { serializeRelapse } from "@/habits/serialize";
 import { desc, eq } from "drizzle-orm";
 
 export async function GET(
@@ -10,22 +11,12 @@ export async function GET(
   const { id } = await params;
 
   const rows = await db
-    .select({
-      id: habitRelapses.id,
-      habitId: habitRelapses.habitId,
-      relapsedAt: habitRelapses.relapsedAt,
-    })
+    .select()
     .from(habitRelapses)
     .where(eq(habitRelapses.habitId, id))
     .orderBy(desc(habitRelapses.relapsedAt));
 
-  return NextResponse.json(
-    rows.map((r) => ({
-      id: r.id,
-      habitId: r.habitId,
-      relapsedAt: r.relapsedAt.toISOString(),
-    })),
-  );
+  return NextResponse.json(rows.map(serializeRelapse));
 }
 
 export async function POST(
@@ -45,12 +36,5 @@ export async function POST(
     .values({ habitId: id, relapsedAt })
     .returning();
 
-  return NextResponse.json(
-    {
-      id: row.id,
-      habitId: row.habitId,
-      relapsedAt: row.relapsedAt.toISOString(),
-    },
-    { status: 201 },
-  );
+  return NextResponse.json(serializeRelapse(row), { status: 201 });
 }

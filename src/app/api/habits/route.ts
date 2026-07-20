@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { habits } from "@/db/schema";
 import { coerceFrequency, coerceHabitType } from "@/habits/domain";
+import { serializeHabit } from "@/habits/serialize";
 import { asc } from "drizzle-orm";
 
 export async function GET() {
@@ -10,20 +11,7 @@ export async function GET() {
     .from(habits)
     .orderBy(asc(habits.createdAt));
 
-  return NextResponse.json(
-    rows.map((h) => ({
-      id: h.id,
-      name: h.name,
-      description: h.description,
-      archived: h.archived,
-      habitType: h.habitType,
-      frequency: h.frequency,
-      target: h.target,
-      unit: h.unit,
-      createdAt: h.createdAt.toISOString(),
-      updatedAt: h.updatedAt.toISOString(),
-    })),
-  );
+  return NextResponse.json(rows.map(serializeHabit));
 }
 
 export async function POST(request: Request) {
@@ -54,20 +42,5 @@ export async function POST(request: Request) {
     })
     .returning();
 
-  return NextResponse.json(
-    {
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      archived: row.archived,
-      habitType: row.habitType,
-      frequency: row.frequency,
-      target: row.target,
-      unit: row.unit,
-      createdAt: row.createdAt.toISOString(),
-      updatedAt: row.updatedAt.toISOString(),
-    },
-    { status: 201 },
-  );
+  return NextResponse.json(serializeHabit(row), { status: 201 });
 }
-

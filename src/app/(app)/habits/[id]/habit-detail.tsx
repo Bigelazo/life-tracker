@@ -1,25 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "motion/react";
 import {
-  buildLogIndex,
   computeBestStreak,
   computeCompletionRate,
-  computeElapsedSince,
   computeStreak,
   computeYearHeatmap,
-  formatElapsed,
-  todayDateString,
 } from "@/habits/domain";
-import type { LogIndex, RelapseInput } from "@/habits/domain";
-import {
-  useHabitLogs,
-  useHabitRelapses,
-  useHabits,
-  useSettings,
-} from "@/habits/hooks";
+import { useHabitDetailProjection } from "@/habits/projection";
 import { YearHeatmap } from "@/components/year-heatmap";
 
 interface StatCardProps {
@@ -57,26 +47,18 @@ function getAvailableYears(createdAt: string, nowYear: number): number[] {
 }
 
 export function HabitDetail({ habitId }: { habitId: string }) {
-  const { data: habits, isLoading: habitsLoading, isError: habitsError } = useHabits();
-  const { data: logs, isLoading: logsLoading } = useHabitLogs({ habitId });
-  const { data: relapseRecords } = useHabitRelapses(habitId);
-  const { data: settings } = useSettings();
+  const {
+    habit,
+    logIndex,
+    relapses,
+    timezone,
+    today,
+    elapsedByHabit,
+    isLoading,
+    isError,
+  } = useHabitDetailProjection(habitId);
 
-  const timezone = settings?.timezone ?? "UTC";
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const today = todayDateString(timezone);
   const currentYear = Number(today.slice(0, 4));
-
-  const habit = useMemo(
-    () => (habits ?? []).find((h) => h.id === habitId) ?? null,
-    [habits, habitId],
-  );
 
   const availableYears = useMemo(
     () => (habit ? getAvailableYears(habit.createdAt, currentYear) : []),
@@ -88,29 +70,7 @@ export function HabitDetail({ habitId }: { habitId: string }) {
     ? selectedYear
     : currentYear;
 
-  const domainLogs = useMemo(
-    () =>
-      (logs ?? []).map((l) => ({
-        habitId: l.habitId,
-        logDate: l.logDate,
-        amount: l.amount,
-      })),
-    [logs],
-  );
-
-  const domainRelapses: RelapseInput[] = useMemo(
-    () =>
-      (relapseRecords ?? []).map((r) => ({
-        id: r.id,
-        habitId: r.habitId,
-        relapsedAt: r.relapsedAt,
-      })),
-    [relapseRecords],
-  );
-
-  const relapseCount = domainRelapses.length;
-
-  const logIndex: LogIndex = useMemo(() => buildLogIndex(domainLogs), [domainLogs]);
+  const relapseCount = relapses.length;
 
   const streak = useMemo(
     () => (habit ? computeStreak(habit, logIndex, timezone) : 0),
@@ -134,20 +94,13 @@ export function HabitDetail({ habitId }: { habitId: string }) {
     return computeYearHeatmap(
       habit,
       logIndex,
-      domainRelapses,
+      relapses,
       safeSelectedYear,
       timezone,
     );
-  }, [habit, logIndex, domainRelapses, safeSelectedYear, timezone]);
+  }, [habit, logIndex, relapses, safeSelectedYear, timezone]);
 
-  const elapsed = useMemo(() => {
-    if (!habit || habit.habitType !== "negative") return null;
-    return computeElapsedSince(habit, domainRelapses, new Date());
-    // tick invalidates the memo once a minute so the counter stays fresh
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [habit, domainRelapses, tick]);
-
-  if (habitsLoading || logsLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <p className="text-ink-subtle text-[14px] leading-[1.5]">Loading...</p>
@@ -155,7 +108,7 @@ export function HabitDetail({ habitId }: { habitId: string }) {
     );
   }
 
-  if (habitsError) {
+  if (isError) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16">
         <p className="text-ink-subtle text-[14px] leading-[1.5]">
@@ -184,6 +137,7 @@ export function HabitDetail({ habitId }: { habitId: string }) {
   const isNegative = habit.habitType === "negative";
   const isArchived = habit.archived;
   const yearLabel = safeSelectedYear;
+  const elapsedStr = elapsedByHabit.get(habit.id) ?? null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -220,7 +174,7 @@ export function HabitDetail({ habitId }: { habitId: string }) {
           <>
             <StatCard
               label="Since last relapse"
-              value={elapsed ? formatElapsed(elapsed) : "—"}
+              value={elapsedStr ?? "—"}
             />
             <StatCard
               label="Relapses"

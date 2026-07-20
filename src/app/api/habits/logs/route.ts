@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { habitLogs } from "@/db/schema";
+import { serializeHabitLog } from "@/habits/serialize";
 import { and, asc, eq, gte } from "drizzle-orm";
 
 /**
@@ -27,24 +28,10 @@ export async function GET(request: Request) {
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   const baseQuery = db
-    .select({
-      id: habitLogs.id,
-      habitId: habitLogs.habitId,
-      logDate: habitLogs.logDate,
-      amount: habitLogs.amount,
-      createdAt: habitLogs.createdAt,
-    })
+    .select()
     .from(habitLogs)
     .orderBy(asc(habitLogs.logDate));
   const rows = where ? await baseQuery.where(where) : await baseQuery;
 
-  return NextResponse.json(
-    rows.map((l) => ({
-      id: l.id,
-      habitId: l.habitId,
-      logDate: l.logDate,
-      amount: l.amount,
-      createdAt: l.createdAt.toISOString(),
-    })),
-  );
+  return NextResponse.json(rows.map(serializeHabitLog));
 }

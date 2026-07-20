@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { habits } from "@/db/schema";
 import { coerceFrequency, coerceHabitType } from "@/habits/domain";
+import { serializeHabit } from "@/habits/serialize";
 import { eq } from "drizzle-orm";
 
 export async function PATCH(
@@ -38,18 +39,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Habit not found" }, { status: 404 });
   }
 
-  return NextResponse.json({
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    archived: row.archived,
-    habitType: row.habitType,
-    frequency: row.frequency,
-    target: row.target,
-    unit: row.unit,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  });
+  return NextResponse.json(serializeHabit(row));
 }
 
 export async function DELETE(
@@ -68,17 +58,5 @@ export async function DELETE(
     return NextResponse.json({ error: "Habit not found" }, { status: 404 });
   }
 
-  return NextResponse.json({
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    archived: row.archived,
-    habitType: row.habitType,
-    frequency: row.frequency,
-    target: row.target,
-    unit: row.unit,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  });
+  return NextResponse.json(serializeHabit(row));
 }
-

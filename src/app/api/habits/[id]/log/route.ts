@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { habitLogs, habits } from "@/db/schema";
+import { serializeHabitLog } from "@/habits/serialize";
 import { and, eq } from "drizzle-orm";
 
 export async function POST(
@@ -28,23 +29,14 @@ export async function POST(
   const isQuantifiable = habit.target !== null;
 
   if (!isQuantifiable) {
-    const existing = await db
-      .select({ id: habitLogs.id, createdAt: habitLogs.createdAt })
+    const [existing] = await db
+      .select()
       .from(habitLogs)
       .where(and(eq(habitLogs.habitId, id), eq(habitLogs.logDate, body.logDate)))
       .limit(1);
 
-    if (existing.length > 0) {
-      return NextResponse.json(
-        {
-          id: existing[0].id,
-          habitId: id,
-          logDate: body.logDate,
-          amount: 1,
-          createdAt: existing[0].createdAt.toISOString(),
-        },
-        { status: 200 },
-      );
+    if (existing) {
+      return NextResponse.json(serializeHabitLog(existing), { status: 200 });
     }
   }
 
@@ -53,16 +45,7 @@ export async function POST(
     .values({ habitId: id, logDate: body.logDate, amount })
     .returning();
 
-  return NextResponse.json(
-    {
-      id: row.id,
-      habitId: id,
-      logDate: body.logDate,
-      amount,
-      createdAt: row.createdAt.toISOString(),
-    },
-    { status: 201 },
-  );
+  return NextResponse.json(serializeHabitLog(row), { status: 201 });
 }
 
 export async function DELETE(

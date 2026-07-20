@@ -1,29 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { CheckIcon } from "@/components/check-icon";
 import { EmptyState } from "@/components/empty-state";
 import {
-  buildLogIndex,
   computeDueToday,
-  computeElapsedSince,
   computeProgress,
-  formatElapsed,
   isoDateNDaysAgo,
-  todayDateString,
 } from "@/habits/domain";
-import type { LogIndex } from "@/habits/domain";
 import {
-  useAllRelapses,
   useCheckHabit,
-  useHabitLogs,
-  useHabits,
-  useSettings,
   useUncheckHabit,
 } from "@/habits/hooks";
-import type { HabitLogResponse, HabitResponse, RelapseResponse } from "@/habits/api-types";
+import { useHabitProjection } from "@/habits/projection";
 
 /**
  * How far back the widget needs log history. The widget only renders
@@ -34,108 +25,42 @@ import type { HabitLogResponse, HabitResponse, RelapseResponse } from "@/habits/
  */
 const WIDGET_LOOKBACK_DAYS = 7;
 
-function isLoadingHabits(
-  habits: HabitResponse[] | undefined,
-  logs: HabitLogResponse[] | undefined,
-  relapses: RelapseResponse[] | undefined,
-): boolean {
-  return habits === undefined || logs === undefined || relapses === undefined;
-}
-
 export function TodayHabitsWidget() {
   const sinceDate = useMemo(() => isoDateNDaysAgo(WIDGET_LOOKBACK_DAYS), []);
+  const {
+    habits,
+    logIndex,
+    timezone,
+    today,
+    elapsedByHabit,
+    isLoading,
+  } = useHabitProjection({ since: sinceDate });
 
-  const { data: habits } = useHabits();
-  const { data: logs } = useHabitLogs({ since: sinceDate });
-  const { data: relapseRecords } = useAllRelapses();
-  const { data: settings } = useSettings();
   const checkHabit = useCheckHabit();
   const uncheckHabit = useUncheckHabit();
 
-  const timezone = settings?.timezone ?? "UTC";
-
-  // Tick invalidates the elapsed-time memo once a minute so the negative
-  // habit counter stays fresh without a full re-render.
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const domainHabits = useMemo(
-    () =>
-      (habits ?? []).map((h) => ({
-        id: h.id,
-        name: h.name,
-        description: h.description,
-        archived: h.archived,
-        habitType: h.habitType,
-        frequency: h.frequency,
-        target: h.target,
-        unit: h.unit,
-        createdAt: h.createdAt,
-      })),
-    [habits],
-  );
-
-  const domainLogs = useMemo(
-    () =>
-      (logs ?? []).map((l) => ({
-        habitId: l.habitId,
-        logDate: l.logDate,
-        amount: l.amount,
-      })),
-    [logs],
-  );
-
-  const domainRelapses = useMemo(
-    () =>
-      (relapseRecords ?? []).map((r) => ({
-        id: r.id,
-        habitId: r.habitId,
-        relapsedAt: r.relapsedAt,
-      })),
-    [relapseRecords],
-  );
-
-  const logIndex: LogIndex = useMemo(() => buildLogIndex(domainLogs), [domainLogs]);
-
   const dueToday = useMemo(
-    () => computeDueToday(domainHabits, logIndex, timezone),
-    [domainHabits, logIndex, timezone],
+    () => (isLoading ? [] : computeDueToday(habits, logIndex, timezone)),
+    [isLoading, habits, logIndex, timezone],
   );
-
-  const today = todayDateString(timezone);
 
   const progressByHabit = useMemo(() => {
     const map = new Map<
       string,
       { current: number; target: number | null; unit: string | null }
     >();
-    for (const habit of domainHabits) {
+    for (const habit of habits) {
       map.set(habit.id, computeProgress(habit, today, logIndex));
     }
     return map;
-  }, [domainHabits, logIndex, today]);
-
-  const elapsedByHabit = useMemo(() => {
-    const map = new Map<string, string>();
-    const now = new Date();
-    for (const habit of domainHabits) {
-      if (habit.habitType === "negative") {
-        map.set(habit.id, formatElapsed(computeElapsedSince(habit, domainRelapses, now)));
-      }
-    }
-    return map;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [domainHabits, domainRelapses, tick]);
+  }, [habits, logIndex, today]);
 
   const completedCount = useMemo(
     () => dueToday.filter((d) => d.done).length,
     [dueToday],
   );
 
-  if (isLoadingHabits(habits, logs, relapseRecords)) {
+  if (isLoading) {
     return (
       <div className="border-hairline bg-surface-1 rounded-lg flex items-center justify-center border p-8">
         <p className="text-ink-subtle text-[14px] leading-[1.5]">Loading…</p>
@@ -154,7 +79,7 @@ export function TodayHabitsWidget() {
   }
 
   function handleToggle(habitId: string, next: boolean) {
-    const logDate = todayDateString(timezone);
+    const logDate = today;
     if (next) {
       checkHabit.mutate({ habitId, logDate });
     } else {
@@ -163,8 +88,7 @@ export function TodayHabitsWidget() {
   }
 
   function handleAddAmount(habitId: string, amount: number) {
-    const logDate = todayDateString(timezone);
-    checkHabit.mutate({ habitId, logDate, amount });
+    checkHabit.mutate({ habitId, logDate: today, amount });
   }
 
   return (

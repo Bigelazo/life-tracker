@@ -1,29 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
-  buildLogIndex,
   computeDueToday,
-  computeElapsedSince,
   computeProgress,
   computeStreak,
-  formatElapsed,
   isoDateNDaysAgo,
-  todayDateString,
 } from "@/habits/domain";
-import type { HabitInput, LogIndex, RelapseInput } from "@/habits/domain";
 import {
-  useAllRelapses,
   useArchiveHabit,
   useCheckHabit,
   useCreateHabit,
-  useHabitLogs,
-  useHabits,
   useRecordRelapse,
-  useSettings,
   useUncheckHabit,
   useUpdateHabit,
 } from "@/habits/hooks";
+import { useHabitProjection } from "@/habits/projection";
 import { HabitCard } from "@/components/habit-card";
 import { HabitForm } from "@/components/habit-form";
 
@@ -40,11 +32,17 @@ const LIST_LOOKBACK_DAYS = 90;
 
 export function HabitsContent() {
   const sinceDate = useMemo(() => isoDateNDaysAgo(LIST_LOOKBACK_DAYS), []);
+  const {
+    habits,
+    logIndex,
+    timezone,
+    today,
+    elapsedByHabit,
+    isLoading,
+    isError,
+    error,
+  } = useHabitProjection({ since: sinceDate });
 
-  const { data: habits, isLoading: habitsLoading, isError: habitsError, error: habitsErr } = useHabits();
-  const { data: logs, isLoading: logsLoading, isError: logsError } = useHabitLogs({ since: sinceDate });
-  const { data: relapseRecords } = useAllRelapses();
-  const { data: settings } = useSettings();
   const createHabit = useCreateHabit();
   const updateHabit = useUpdateHabit();
   const archiveHabit = useArchiveHabit();
@@ -52,95 +50,30 @@ export function HabitsContent() {
   const uncheckHabit = useUncheckHabit();
   const recordRelapse = useRecordRelapse();
 
-  const timezone = settings?.timezone ?? "UTC";
-
-  // Tick invalidates the elapsed-time memo once a minute so the negative
-  // habit counters on the list stay fresh without a full re-render.
-  const [tick, setTick] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 60_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const domainHabits: HabitInput[] = useMemo(
-    () =>
-      (habits ?? []).map((h) => ({
-        id: h.id,
-        name: h.name,
-        description: h.description,
-        archived: h.archived,
-        habitType: h.habitType,
-        frequency: h.frequency,
-        target: h.target,
-        unit: h.unit,
-        createdAt: h.createdAt,
-      })),
-    [habits],
+  const dueToday = useMemo(
+    () => (isLoading ? [] : computeDueToday(habits, logIndex, timezone)),
+    [isLoading, habits, logIndex, timezone],
   );
-
-  const domainLogs = useMemo(
-    () =>
-      (logs ?? []).map((l) => ({
-        habitId: l.habitId,
-        logDate: l.logDate,
-        amount: l.amount,
-      })),
-    [logs],
-  );
-
-  const domainRelapses: RelapseInput[] = useMemo(
-    () =>
-      (relapseRecords ?? []).map((r) => ({
-        id: r.id,
-        habitId: r.habitId,
-        relapsedAt: r.relapsedAt,
-      })),
-    [relapseRecords],
-  );
-
-  // Build the index once per logs reference; every per-habit computation
-  // below reuses it instead of re-filtering the full array.
-  const logIndex: LogIndex = useMemo(() => buildLogIndex(domainLogs), [domainLogs]);
-
-  const dueToday = useMemo(() => {
-    if (!habits) return [];
-    return computeDueToday(domainHabits, logIndex, timezone);
-  }, [habits, domainHabits, logIndex, timezone]);
 
   const streaks = useMemo(() => {
-    if (!habits || !logs) return new Map<string, number>();
+    if (isLoading) return new Map<string, number>();
     const map = new Map<string, number>();
-    for (const habit of domainHabits) {
+    for (const habit of habits) {
       map.set(habit.id, computeStreak(habit, logIndex, timezone));
     }
     return map;
-  }, [habits, logs, domainHabits, logIndex, timezone]);
+  }, [isLoading, habits, logIndex, timezone]);
 
   const progressMap = useMemo(() => {
-    const today = todayDateString(timezone);
     const map = new Map<string, { current: number; target: number | null; unit: string | null }>();
-    for (const habit of domainHabits) {
+    for (const habit of habits) {
       map.set(habit.id, computeProgress(habit, today, logIndex));
     }
     return map;
-  }, [domainHabits, logIndex, timezone]);
-
-  const elapsedMap = useMemo(() => {
-    const map = new Map<string, string>();
-    const now = new Date();
-    for (const habit of domainHabits) {
-      if (habit.habitType === "negative") {
-        const elapsed = computeElapsedSince(habit, domainRelapses, now);
-        map.set(habit.id, formatElapsed(elapsed));
-      }
-    }
-    return map;
-    // tick invalidates once a minute so the counter stays fresh
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [domainHabits, domainRelapses, tick]);
+  }, [habits, logIndex, today]);
 
   function handleToggle(habitId: string, next: boolean) {
-    const logDate = todayDateString(timezone);
+    const logDate = today;
     if (next) {
       checkHabit.mutate({ habitId, logDate });
     } else {
@@ -149,8 +82,7 @@ export function HabitsContent() {
   }
 
   function handleAddAmount(habitId: string, amount: number) {
-    const logDate = todayDateString(timezone);
-    checkHabit.mutate({ habitId, logDate, amount });
+    checkHabit.mutate({ habitId, logDate: today, amount });
   }
 
   function handleCreate(data: {
@@ -164,7 +96,7 @@ export function HabitsContent() {
     createHabit.mutate(data as Parameters<typeof createHabit.mutate>[0]);
   }
 
-  if (habitsLoading || logsLoading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
         <p className="text-[#8a8f98] text-[14px] leading-[1.5]">Loading...</p>
@@ -172,15 +104,15 @@ export function HabitsContent() {
     );
   }
 
-  if (habitsError || logsError) {
+  if (isError) {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-16">
         <p className="text-[#8a8f98] text-[14px] leading-[1.5]">
           Failed to load habits. Check that the database migration has been applied.
         </p>
-        {habitsErr && (
+        {error && (
           <p className="text-[#62666d] text-[12px] leading-[1.4]">
-            {(habitsErr as Error).message}
+            {error.message}
           </p>
         )}
       </div>
@@ -214,7 +146,7 @@ export function HabitsContent() {
                 unit={habit.unit}
                 currentAmount={progress?.current ?? 0}
                 isNegative={isNegative}
-                elapsed={isNegative ? (elapsedMap.get(habit.id) ?? null) : null}
+                elapsed={isNegative ? (elapsedByHabit.get(habit.id) ?? null) : null}
                 onToggle={(next) => handleToggle(habit.id, next)}
                 onArchive={() => archiveHabit.mutate(habit.id)}
                 onRename={(name, description) =>
