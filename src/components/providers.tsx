@@ -1,6 +1,11 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  MutationCache,
+  QueryClient,
+  QueryClientProvider,
+} from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useState, type ReactNode } from "react";
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -10,6 +15,11 @@ export function Providers({ children }: { children: ReactNode }) {
         defaultOptions: {
           queries: { staleTime: 30_000 },
         },
+        mutationCache: new MutationCache({
+          onError: () => {
+            toast.error("Action failed — try again");
+          },
+        }),
       }),
   );
 

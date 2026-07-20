@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@custom-variant dark (&:is(.dark *));
 
 /*
  * Life Tracker theme — tokens sourced from DESIGN.md (Linear dark system).

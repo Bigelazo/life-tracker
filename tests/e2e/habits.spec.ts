@@ -12,74 +12,98 @@ test("can create a new habit from the UI", async ({ page }) => {
 
   const nameInput = page.getByPlaceholder("Habit name");
   await expect(nameInput).toBeVisible();
-  await nameInput.fill("Exercise");
+  const name = `Exercise ${unique()}`;
+  await nameInput.fill(name);
 
   await page.getByRole("button", { name: "Create" }).click();
 
-  await expect(page.getByText("Exercise", { exact: true })).toBeVisible();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
 });
 
 test("can check off and uncheck a habit", async ({ page }) => {
   await page.goto("/habits");
 
+  const name = `Read ${unique()}`;
   await page.getByText("+ New habit").click();
-  await page.getByPlaceholder("Habit name").fill("Read");
+  await page.getByPlaceholder("Habit name").fill(name);
   await page.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByText("Read", { exact: true })).toBeVisible();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
 
-  const checkbox = page.getByLabel("Mark Read as done");
-  await checkbox.click();
+  const link = page.getByRole("link", { name: `View details for ${name}` });
+  const card = link.locator("xpath=ancestor::div[contains(@class, 'rounded-lg')][1]");
 
-  // Wait for optimistic update
-  await expect(checkbox).toHaveAttribute("aria-label", "Unmark Read as done");
+  const checkResponse = page.waitForResponse(
+    (res) =>
+      res.url().includes("/api/habits/") &&
+      res.url().includes("/log") &&
+      res.request().method() === "POST",
+  );
+  await card.getByLabel(`Mark ${name} as done`).click();
+  await checkResponse;
 
   await page.reload();
   await expect(
-    page.getByLabel("Unmark Read as done"),
+    page.getByLabel(`Unmark ${name} as done`),
   ).toBeVisible();
 
   // Uncheck
-  await page.getByLabel("Unmark Read as done").click();
-  await expect(page.getByLabel("Mark Read as done")).toBeVisible();
+  const uncheckResponse = page.waitForResponse(
+    (res) =>
+      res.url().includes("/api/habits/") &&
+      res.url().includes("/log") &&
+      res.request().method() === "DELETE",
+  );
+  await page.getByLabel(`Unmark ${name} as done`).click();
+  await uncheckResponse;
+
+  await expect(page.getByLabel(`Mark ${name} as done`)).toBeVisible();
 
   await page.reload();
-  await expect(page.getByLabel("Mark Read as done")).toBeVisible();
+  await expect(page.getByLabel(`Mark ${name} as done`)).toBeVisible();
 });
 
 test("can edit a habit name and description", async ({ page }) => {
   await page.goto("/habits");
 
+  const name = `Meditate ${unique()}`;
   await page.getByText("+ New habit").click();
-  await page.getByPlaceholder("Habit name").fill("Meditate");
+  await page.getByPlaceholder("Habit name").fill(name);
   await page.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByText("Meditate", { exact: true })).toBeVisible();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
 
-  await page.getByText("Edit").click();
+  const link = page.getByRole("link", { name: `View details for ${name}` });
+  const card = link.locator("xpath=ancestor::div[contains(@class, 'rounded-lg')][1]");
+  await card.locator("button", { hasText: "Edit" }).click();
   const nameInput = page.getByPlaceholder("Habit name");
   const descInput = page.getByPlaceholder("Description (optional)");
 
-  await nameInput.fill("Meditate twice");
-  await descInput.fill("Morning and evening");
+  const renamed = `${name} twice`;
+  const desc = `Morning and evening ${unique()}`;
+  await nameInput.fill(renamed);
+  await descInput.fill(desc);
   await page.getByRole("button", { name: "Save" }).click();
 
   await expect(
-    page.getByText("Meditate twice", { exact: true }),
+    page.getByText(renamed, { exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("Morning and evening")).toBeVisible();
+  await expect(page.getByText(desc)).toBeVisible();
 });
 
 test("can archive a habit", async ({ page }) => {
   await page.goto("/habits");
 
+  const name = `Journal ${unique()}`;
   await page.getByText("+ New habit").click();
-  await page.getByPlaceholder("Habit name").fill("Journal");
+  await page.getByPlaceholder("Habit name").fill(name);
   await page.getByRole("button", { name: "Create" }).click();
-  await expect(page.getByText("Journal", { exact: true })).toBeVisible();
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
 
-  await page.getByText("Archive").click();
+  const link = page.getByRole("link", { name: `View details for ${name}` });
+  const card = link.locator("xpath=ancestor::div[contains(@class, 'rounded-lg')][1]");
+  await card.locator("button", { hasText: "Archive" }).click();
 
   await expect(
-    page.getByText("Journal", { exact: true }),
+    page.getByText(name, { exact: true }),
   ).not.toBeVisible();
 });
 
