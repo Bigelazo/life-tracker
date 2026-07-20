@@ -2,39 +2,56 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Life Tracker theme — tokens sourced from DESIGN.md (Linear dark system).
- * Dark-only: the product never ships a light mode.
+ * Life Tracker theme — Linear tokens remain in place for the surfaces
+ * still consuming them (Habits / Auth / Command — migrated in #24).
+ * Notion tokens are added in this ticket for the Sidebar + Today
+ * surfaces. Token values are sourced from DESIGN.md v2; per-role
+ * typography tokens (heading-1, heading-2, …) are also added there.
  */
 
 @theme {
-  /* Surfaces */
+  /* ─── Linear tokens (legacy; migrated in #24) ───────────────── */
   --color-canvas: #010102;
   --color-surface-1: #0f1011;
   --color-surface-2: #141516;
   --color-surface-3: #18191a;
   --color-surface-4: #191a1b;
-
-  /* Hairlines */
   --color-hairline: #23252a;
   --color-hairline-strong: #34343a;
   --color-hairline-tertiary: #3e3e44;
-
-  /* Text */
   --color-ink: #f7f8f8;
   --color-ink-muted: #d0d6e0;
   --color-ink-subtle: #8a8f98;
   --color-ink-tertiary: #62666d;
-
-  /* Accent — scarce: brand, primary CTA, focus, link emphasis only */
   --color-primary: #5e6ad2;
   --color-on-primary: #ffffff;
   --color-primary-hover: #828fff;
   --color-primary-focus: #5e69d1;
-
-  /* Semantic */
   --color-success: #27a644;
 
-  /* Radii (DESIGN.md rounded scale) */
+  /* ─── Notion tokens — light surface ramp (DESIGN.md v2) ─────── */
+  --color-notion-canvas: #ffffff;
+  --color-notion-canvas-soft: #f6f5f4;
+  --color-notion-surface: #ffffff;
+  --color-notion-surface-soft: #fafafa;
+  --color-notion-surface-raised: #ffffff;
+
+  /* Notion text ink (4-tier, AA-verified against canvas-soft) */
+  --color-notion-ink: #000000;
+  --color-notion-ink-secondary: #31302e;
+  --color-notion-ink-muted: #615d59;
+  --color-notion-ink-faint: #706b65;
+
+  /* Notion hairlines */
+  --color-notion-hairline: #e6e6e6;
+  --color-notion-hairline-strong: #cccccc;
+
+  /* Notion primary — same literal value in both themes (ADR 0003) */
+  --color-notion-primary: #0075de;
+  --color-notion-primary-active: #005bab;
+  --color-notion-on-primary: #ffffff;
+
+  /* ─── Radii (DESIGN.md rounded scale) ───────────────────────── */
   --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 8px;
@@ -42,13 +59,40 @@
   --radius-xl: 16px;
   --radius-2xl: 24px;
 
-  /* Type */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* ─── Type ──────────────────────────────────────────────────── */
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
 }
 
+/*
+ * Notion tokens are light by default. The `.dark` block mechanically
+ * inverts the warm-paper / near-black pair (R≥G≥B preserved) per
+ * DESIGN.md v2's dark appendix; the primary blue stays unchanged
+ * across themes (ADR 0003). Overriding the @theme-defined
+ * --color-notion-* variables at the `.dark` selector swaps the
+ * generated Tailwind utilities (`bg-notion-canvas`, etc.) too.
+ */
 :root {
+  color-scheme: light;
+}
+
+.dark {
   color-scheme: dark;
+
+  --color-notion-canvas: #1f1d1a;
+  --color-notion-canvas-soft: #1f1d1a;
+  --color-notion-surface: #26231f;
+  --color-notion-surface-soft: #2c2823;
+  --color-notion-surface-raised: #33302b;
+  --color-notion-ink: #f6f5f4;
+  --color-notion-ink-secondary: #d4cfc7;
+  --color-notion-ink-muted: #c9c4be;
+  --color-notion-ink-faint: #a39e98;
+  --color-notion-hairline: #3a3631;
+  --color-notion-hairline-strong: #4c4843;
+  --color-notion-primary: #0075de;
+  --color-notion-primary-active: #005bab;
+  --color-notion-on-primary: #ffffff;
 }
 
 body {
@@ -73,5 +117,75 @@ body {
   *:focus-visible {
     outline: 2px solid color-mix(in srgb, var(--color-primary-focus) 50%, transparent);
     outline-offset: 2px;
+  }
+}
+
+/*
+ * Notion per-role typography utilities — DESIGN.md v2 heading-1…
+ * heading-3 / title / body-md / body-sm / button / caption / eyebrow.
+ * These bundle the per-role tracking so consumers don't re-derive it
+ * via arbitrary Tailwind classes. The utilities are opt-in: h1, h2,
+ * … still use the base layer's tracking unless the consumer explicitly
+ * applies one of these.
+ */
+@layer utilities {
+  .text-heading-1 {
+    font-family: var(--font-sans);
+    font-size: 40px;
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -1px;
+    text-wrap: balance;
+  }
+  .text-heading-2 {
+    font-family: var(--font-sans);
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1.23;
+    letter-spacing: -0.625px;
+    text-wrap: balance;
+  }
+  .text-heading-3 {
+    font-family: var(--font-sans);
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.27;
+    letter-spacing: -0.25px;
+    text-wrap: balance;
+  }
+  .text-title {
+    font-family: var(--font-sans);
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: -0.125px;
+  }
+  .text-body-md {
+    font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.5;
+    letter-spacing: 0;
+  }
+  .text-body-sm {
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.33;
+    letter-spacing: 0;
+  }
+  .text-caption {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 1.43;
+    letter-spacing: 0;
+  }
+  .text-eyebrow {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.33;
+    letter-spacing: 0.125px;
   }
 }

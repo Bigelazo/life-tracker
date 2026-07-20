@@ -166,7 +166,26 @@ describe("TodayHabitsWidget", () => {
     expect(addButton).toBeInTheDocument();
   });
 
-  it("calls the check mutation with amount=1 when +1 is clicked on a quantifiable habit", () => {
+  it("opens an AlertDialog when the add-amount button is clicked", () => {
+    useHabitsMock.mockReturnValue({
+      data: [
+        habit({
+          id: "water",
+          name: "Water",
+          target: 2,
+          unit: "L",
+        }),
+      ],
+    });
+    render(<TodayHabitsWidget />);
+    fireEvent.click(screen.getByTestId("habit-add-amount"));
+    expect(
+      screen.getByRole("alertdialog"),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Add amount for Water/)).toBeInTheDocument();
+  });
+
+  it("calls the check mutation with amount=1 when the dialog Add button is confirmed", () => {
     const mutate = vi.fn();
     useCheckHabitMock.mockReturnValue({ mutate });
     useHabitsMock.mockReturnValue({
@@ -181,11 +200,56 @@ describe("TodayHabitsWidget", () => {
     });
     render(<TodayHabitsWidget />);
     fireEvent.click(screen.getByTestId("habit-add-amount"));
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
     expect(mutate).toHaveBeenCalledWith({
       habitId: "water",
       logDate: "2026-07-18",
       amount: 1,
     });
+  });
+
+  it("calls the check mutation with a custom amount when the dialog input is changed", () => {
+    const mutate = vi.fn();
+    useCheckHabitMock.mockReturnValue({ mutate });
+    useHabitsMock.mockReturnValue({
+      data: [
+        habit({
+          id: "water",
+          name: "Water",
+          target: 5,
+          unit: "L",
+        }),
+      ],
+    });
+    render(<TodayHabitsWidget />);
+    fireEvent.click(screen.getByTestId("habit-add-amount"));
+    const input = screen.getByLabelText("Amount");
+    fireEvent.change(input, { target: { value: "2.5" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    expect(mutate).toHaveBeenCalledWith({
+      habitId: "water",
+      logDate: "2026-07-18",
+      amount: 2.5,
+    });
+  });
+
+  it("does not call the mutation when the dialog is cancelled", () => {
+    const mutate = vi.fn();
+    useCheckHabitMock.mockReturnValue({ mutate });
+    useHabitsMock.mockReturnValue({
+      data: [
+        habit({
+          id: "water",
+          name: "Water",
+          target: 2,
+          unit: "L",
+        }),
+      ],
+    });
+    render(<TodayHabitsWidget />);
+    fireEvent.click(screen.getByTestId("habit-add-amount"));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(mutate).not.toHaveBeenCalled();
   });
 
   it("marks a quantifiable habit done when the cumulative amount reaches the target", () => {

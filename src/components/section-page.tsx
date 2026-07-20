@@ -1,5 +1,5 @@
-import type { SectionSlug } from "@/lib/sections";
 import { EmptyState } from "@/components/empty-state";
+import type { SectionSlug } from "@/lib/sections";
 
 export function SectionPage({
   slug,
@@ -14,9 +14,7 @@ export function SectionPage({
 }) {
   return (
     <section>
-      <h1 className="mb-6 text-[28px] leading-[1.2] font-semibold tracking-[-0.6px]">
-        {title}
-      </h1>
+      <h1 className="text-heading-2 text-notion-ink mb-6">{title}</h1>
       <EmptyState
         slug={slug}
         title={emptyStateTitle}

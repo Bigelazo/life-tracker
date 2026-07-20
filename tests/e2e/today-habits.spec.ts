@@ -103,7 +103,7 @@ test("the Today habits widget links each row to the habit detail page", async ({
   ).toBeVisible();
 });
 
-test("the Today habits widget shows the '+1' quick action for quantifiable habits", async ({
+test("the Today habits widget shows the '+' quick action and opens an add-amount dialog", async ({
   page,
 }) => {
   const name = `Water ${unique()}`;
@@ -119,6 +119,14 @@ test("the Today habits widget shows the '+1' quick action for quantifiable habit
 
   const addButton = row.getByTestId("habit-add-amount");
   await addButton.click();
+
+  // The button now opens a dialog with a focused amount input pre-filled
+  // to 1. Confirming posts a 1-unit log and the row's counter moves to 1.
+  const dialog = page.getByRole("alertdialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(/Add amount for/)).toBeVisible();
+
+  await dialog.getByRole("button", { name: "Add" }).click();
 
   // After the optimistic update, the cumulative amount is 1.
   await expect(row.getByText("1 / 2 L")).toBeVisible();

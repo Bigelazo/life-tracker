@@ -34,8 +34,10 @@ test("the PWA manifest is served with the canvas theme color", async ({
   const manifest = await response.json();
   expect(manifest.name).toBe("Life Tracker");
   expect(manifest.display).toBe("standalone");
-  expect(manifest.theme_color).toBe("#010102");
-  expect(manifest.background_color).toBe("#010102");
+  // Notion-paper canvas is the canonical light theme; the dark variant
+  // is advertised via <meta name="theme-color"> in the document.
+  expect(manifest.theme_color).toBe("#f6f5f4");
+  expect(manifest.background_color).toBe("#f6f5f4");
   expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
 });
 

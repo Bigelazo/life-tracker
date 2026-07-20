@@ -1,13 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Geist_Mono, Inter } from "next/font/google";
+import { Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
-const inter = Inter({
-  variable: "--font-inter",
+const jakarta = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -21,11 +22,14 @@ export const metadata: Metadata = {
     template: "%s · Life Tracker",
   },
   description:
-    "Personal habits, finance and notes hub — one calm, dark, fast home for your day.",
+    "Personal habits, finance and notes hub — one calm, paper-light home for your day.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#010102",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1f1d1a" },
+  ],
 };
 
 export default function RootLayout({
@@ -36,10 +40,10 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${jakarta.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="bg-canvas text-ink min-h-full">
+      <body className="bg-notion-canvas-soft text-notion-ink min-h-full">
         <ThemeProvider
           attribute="class"
           defaultTheme="light"

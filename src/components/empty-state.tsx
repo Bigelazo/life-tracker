@@ -1,22 +1,38 @@
-import type { SectionSlug } from "@/lib/sections";
-import { SectionIcon } from "@/components/section-icon";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  SECTION_ICONS,
+  type SectionSlug,
+} from "@/lib/sections";
+import { cn } from "@/lib/utils";
 
 export function EmptyState({
   slug,
   title,
   description,
+  className,
 }: {
   slug: SectionSlug;
   title: string;
   description: string;
+  className?: string;
 }) {
   return (
-    <div className="border-hairline bg-surface-1 rounded-lg flex flex-col items-center justify-center gap-3 border px-6 py-20 text-center">
-      <SectionIcon slug={slug} className="text-ink-tertiary size-8" />
-      <h2 className="text-ink text-[22px] leading-[1.25] font-medium tracking-[-0.4px]">
-        {title}
-      </h2>
-      <p className="text-ink-subtle max-w-sm text-sm">{description}</p>
-    </div>
+    <Card
+      className={cn(
+        "bg-notion-canvas-soft text-notion-ink border-notion-hairline items-center justify-center rounded-xl border py-8 text-center shadow-none",
+        className,
+      )}
+    >
+      <CardHeader className="items-center gap-3 px-6">
+        {(() => {
+          const Icon = SECTION_ICONS[slug];
+          return <Icon className="text-notion-ink-muted size-7" aria-hidden />;
+        })()}
+        <CardTitle className="text-title text-notion-ink">{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="text-body-md text-notion-ink-muted max-w-sm px-6 pb-2">
+        {description}
+      </CardContent>
+    </Card>
   );
 }

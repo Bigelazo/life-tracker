@@ -7,7 +7,7 @@ export default function AppLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <Providers>
-      <div className="flex min-h-screen">
+      <div className="bg-notion-canvas-soft flex min-h-screen">
         <AppNav />
         <main className="flex-1 px-4 pt-6 pb-24 md:px-8 md:pt-8 md:pb-8">
           {children}

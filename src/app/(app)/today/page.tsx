@@ -19,7 +19,7 @@ export default function TodayPage() {
   return (
     <section>
       <m.h1
-        className="mb-8 text-[28px] leading-[1.2] font-semibold tracking-[-0.6px]"
+        className="text-heading-2 text-notion-ink mb-8"
         initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: "easeOut" }}
@@ -28,7 +28,7 @@ export default function TodayPage() {
       </m.h1>
 
       <m.div
-        className="mb-4"
+        className="mb-6"
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: "easeOut" }}
