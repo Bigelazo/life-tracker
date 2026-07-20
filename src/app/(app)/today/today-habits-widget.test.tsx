@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { HabitLogResponse, HabitResponse, RelapseResponse } from "@/habits/api-types";
 
 const useHabitsMock = vi.fn<() => { data: HabitResponse[] | undefined }>();
@@ -248,18 +248,5 @@ describe("TodayHabitsWidget", () => {
     render(<TodayHabitsWidget />);
     const link = screen.getByRole("link", { name: /View all habits/ });
     expect(link).toHaveAttribute("href", "/habits");
-  });
-
-  it("shows the 'more' overflow count when more than maxRows are due", () => {
-    useHabitsMock.mockReturnValue({
-      data: [
-        habit({ id: "1", name: "A" }),
-        habit({ id: "2", name: "B" }),
-        habit({ id: "3", name: "C" }),
-        habit({ id: "4", name: "D" }),
-      ],
-    });
-    render(<TodayHabitsWidget maxRows={2} />);
-    expect(within(screen.getByTestId("today-habits-widget")).getByText("+2 more")).toBeInTheDocument();
   });
 });

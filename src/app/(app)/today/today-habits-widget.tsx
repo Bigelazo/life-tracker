@@ -42,17 +42,7 @@ function isLoadingHabits(
   return habits === undefined || logs === undefined || relapses === undefined;
 }
 
-interface TodayHabitsWidgetProps {
-  /**
-   * Maximum number of rows to render. Anything past this bound still
-   * counts toward the header summary, but is hidden behind a "+N more"
-   * link to /habits. Defaults to no cap — the widget is the primary
-   * morning surface, and the owner wants to see everything due today.
-   */
-  maxRows?: number;
-}
-
-export function TodayHabitsWidget({ maxRows }: TodayHabitsWidgetProps = {}) {
+export function TodayHabitsWidget() {
   const sinceDate = useMemo(() => isoDateNDaysAgo(WIDGET_LOOKBACK_DAYS), []);
 
   const { data: habits } = useHabits();
@@ -163,11 +153,6 @@ export function TodayHabitsWidget({ maxRows }: TodayHabitsWidgetProps = {}) {
     );
   }
 
-  const visibleRows =
-    typeof maxRows === "number" ? dueToday.slice(0, maxRows) : dueToday;
-  const overflow = Math.max(0, dueToday.length - visibleRows.length);
-  const hasOverflow = overflow > 0;
-
   function handleToggle(habitId: string, next: boolean) {
     const logDate = todayDateString(timezone);
     if (next) {
@@ -189,7 +174,7 @@ export function TodayHabitsWidget({ maxRows }: TodayHabitsWidgetProps = {}) {
       className="border-hairline bg-surface-1 rounded-lg flex flex-col gap-1 border p-3"
     >
       <header className="flex items-baseline justify-between px-2 pt-1 pb-3">
-        <h2 className="text-ink text-[16px] font-semibold leading-[1.4] tracking-[-0.05px]">
+        <h2 className="text-ink text-[22px] leading-[1.25] font-medium tracking-[-0.4px]">
           Today&apos;s habits
         </h2>
         <span className="text-ink-subtle text-[12px] leading-[1.3] font-medium">
@@ -199,7 +184,7 @@ export function TodayHabitsWidget({ maxRows }: TodayHabitsWidgetProps = {}) {
 
       <ul className="flex flex-col">
         <AnimatePresence initial={false}>
-          {visibleRows.map(({ habit, done }) => {
+          {dueToday.map(({ habit, done }) => {
             const isNegative = habit.habitType === "negative";
             const isQuantifiable = habit.target !== null;
             const progress = progressByHabit.get(habit.id);
@@ -220,17 +205,12 @@ export function TodayHabitsWidget({ maxRows }: TodayHabitsWidgetProps = {}) {
                     aria-hidden
                     className="border-hairline-strong flex size-5 shrink-0 items-center justify-center rounded-sm border"
                   />
-                ) : isQuantifiable ? (
-                  <ProgressCheckbox
-                    done={done}
-                    name={habit.name}
-                    onToggle={(next) => handleToggle(habit.id, next)}
-                  />
                 ) : (
-                  <BooleanCheckbox
+                  <HabitCheckbox
                     done={done}
                     name={habit.name}
                     onToggle={(next) => handleToggle(habit.id, next)}
+                    readOnly={isQuantifiable}
                   />
                 )}
 
@@ -266,14 +246,7 @@ export function TodayHabitsWidget({ maxRows }: TodayHabitsWidgetProps = {}) {
         </AnimatePresence>
       </ul>
 
-      <footer className="mt-1 flex items-center justify-between border-t border-hairline px-2 pt-3">
-        {hasOverflow ? (
-          <span className="text-ink-tertiary text-[12px] leading-[1.3]">
-            +{overflow} more
-          </span>
-        ) : (
-          <span />
-        )}
+      <footer className="mt-1 flex justify-end border-t border-hairline px-2 pt-3">
         <Link
           href="/habits"
           className="text-ink-subtle hover:text-ink text-[12px] leading-[1.3] font-medium transition-colors"
@@ -285,56 +258,33 @@ export function TodayHabitsWidget({ maxRows }: TodayHabitsWidgetProps = {}) {
   );
 }
 
-function BooleanCheckbox({
+function HabitCheckbox({
   done,
   name,
   onToggle,
+  readOnly,
 }: {
   done: boolean;
   name: string;
   onToggle: (next: boolean) => void;
+  /**
+   * Quantifiable habits' "done" state is reached by accumulating
+   * amounts via the `+` button, not by clicking the checkbox. The
+   * checkbox is kept as a read-only visual so the row reads
+   * consistently with boolean habits.
+   */
+  readOnly?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={() => onToggle(!done)}
+      disabled={readOnly}
       role="checkbox"
       aria-checked={done}
       aria-label={done ? `Unmark ${name} as done` : `Mark ${name} as done`}
       data-testid="habit-checkbox"
-      className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border transition-colors"
-      style={{
-        borderColor: done ? "var(--color-primary)" : "var(--color-hairline-strong)",
-        backgroundColor: done ? "var(--color-primary)" : "transparent",
-      }}
-    >
-      {done ? <CheckIcon className="size-3 text-white" /> : null}
-    </button>
-  );
-}
-
-function ProgressCheckbox({
-  done,
-  name,
-  onToggle,
-}: {
-  done: boolean;
-  name: string;
-  onToggle: (next: boolean) => void;
-}) {
-  // For quantifiable habits the checkbox is a "+1" surface that contributes
-  // a single unit; the day is "done" only when the cumulative amount
-  // reaches the target. We still expose the checked/unchecked visual so
-  // the row reads consistently with boolean habits.
-  return (
-    <button
-      type="button"
-      onClick={() => onToggle(true)}
-      role="checkbox"
-      aria-checked={done}
-      aria-label={done ? `${name} target reached` : `Add one ${name}`}
-      data-testid="habit-progress-checkbox"
-      className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border transition-colors"
+      className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-sm border transition-colors disabled:cursor-default"
       style={{
         borderColor: done ? "var(--color-primary)" : "var(--color-hairline-strong)",
         backgroundColor: done ? "var(--color-primary)" : "transparent",

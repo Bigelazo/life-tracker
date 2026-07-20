@@ -33,7 +33,6 @@ export function CommandPalette() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [pendingHabitId, setPendingHabitId] = useState<string | null>(null);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
@@ -87,9 +86,10 @@ export function CommandPalette() {
     [domainHabits, logIndex, timezone],
   );
 
-  // Habits eligible for a one-keystroke check-off: positive (boolean or
-  // quantifiable), due today, and not already done. Negative habits use a
-  // different model (relapse) and don't get a check-off action.
+  // "Check off <habit>" surfaces for every due positive habit that is not
+  // already done. Negative habits use a different model (relapse) and
+  // already-done positives don't need a second tap — clicking them would
+  // create a duplicate log row.
   const checkOffHabits = useMemo(
     () =>
       dueToday.filter(
@@ -98,6 +98,8 @@ export function CommandPalette() {
     [dueToday],
   );
 
+  // "Go to <habit>" surfaces for every active habit. Archived habits are
+  // filtered out — they're dormant and shouldn't crowd the command list.
   const allHabits = useMemo(
     () =>
       (habits ?? [])
@@ -115,7 +117,6 @@ export function CommandPalette() {
     const habit = domainHabits.find((h) => h.id === habitId);
     if (!habit) return;
     setOpen(false);
-    setPendingHabitId(habitId);
     const logDate = todayDateString(timezone);
     // For boolean habits the server treats an insert of amount 1 as a
     // check (idempotent). For quantifiable habits, adding 1 unit is the
@@ -124,7 +125,6 @@ export function CommandPalette() {
     const amount = habit.target !== null ? 1 : undefined;
     checkHabit.mutate(
       amount !== undefined ? { habitId, logDate, amount } : { habitId, logDate },
-      { onSettled: () => setPendingHabitId(null) },
     );
   }
 
@@ -166,15 +166,11 @@ export function CommandPalette() {
                   <CommandItem
                     key={`check-${habit.id}`}
                     value={`check off ${habit.name}`}
-                    disabled={pendingHabitId === habit.id}
                     onSelect={() => handleCheckOff(habit.id)}
                     className="text-ink aria-selected:bg-surface-3 flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-colors"
                   >
                     <CheckBadge />
                     <span className="flex-1">Check off {habit.name}</span>
-                    {pendingHabitId === habit.id ? (
-                      <span className="text-ink-tertiary text-xs">…</span>
-                    ) : null}
                   </CommandItem>
                 ))
               ) : null}
